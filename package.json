@@ -1,0 +1,71 @@
+{
+    "name": "@your-org/custom-automapper",
+    "version": "1.0.0",
+    "description": "A powerful, type-safe object mapping library for TypeScript and NestJS",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:cov": "jest --coverage",
+        "lint": "eslint src/**/*.ts",
+        "format": "prettier --write \"src/**/*.ts\"",
+        "prepublishOnly": "npm run build"
+    },
+    "keywords": [
+        "automapper",
+        "mapper",
+        "object-mapper",
+        "dto",
+        "nestjs",
+        "typescript",
+        "mapping",
+        "transformation"
+    ],
+    "author": "Your Name",
+    "license": "MIT",
+    "peerDependencies": {
+        "@nestjs/common": "^10.0.0",
+        "@nestjs/core": "^10.0.0",
+        "reflect-metadata": "^0.1.13 || ^0.2.0",
+        "rxjs": "^7.0.0"
+    },
+    "peerDependenciesMeta": {
+        "@nestjs/common": {
+            "optional": true
+        },
+        "@nestjs/core": {
+            "optional": true
+        },
+        "rxjs": {
+            "optional": true
+        }
+    },
+    "dependencies": {
+        "reflect-metadata": "^0.2.0"
+    },
+    "devDependencies": {
+        "@nestjs/common": "^10.0.0",
+        "@nestjs/core": "^10.0.0",
+        "@nestjs/testing": "^10.0.0",
+        "@types/jest": "^30.0.0",
+        "@types/node": "^20.0.0",
+        "@typescript-eslint/eslint-plugin": "^6.0.0",
+        "@typescript-eslint/parser": "^6.0.0",
+        "eslint": "9",
+        "jest": "^30.2.0",
+        "prettier": "^3.0.0",
+        "rxjs": "^7.8.0",
+        "ts-jest": "^29.4.5",
+        "typescript": "^5.0.0"
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "engines": {
+        "node": ">=16.0.0"
+    }
+}
