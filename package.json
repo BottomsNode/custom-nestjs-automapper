@@ -1,6 +1,6 @@
 {
     "name": "@nishit_shivdasani/custom-automapper",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "A powerful, type-safe object mapping library for TypeScript and NestJS",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
