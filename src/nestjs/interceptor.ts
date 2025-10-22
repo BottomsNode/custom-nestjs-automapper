@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Mapper } from '../core/mapper';
 
-export class AutoMapInterceptor<T extends object> implements NestInterceptor<T, any> {
+export class AutoMapInterceptor<T extends object = any> implements NestInterceptor<T, any> {
     constructor(
         private mapper: Mapper,
         private destination: new () => any

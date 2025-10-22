@@ -6,6 +6,6 @@ export function isArray(value: any): value is any[] {
     return Array.isArray(value);
 }
 
-export function isEnumValue<T>(enumObj: T, value: any): boolean {
+export function isEnumValue<T extends object>(enumObj: T, value: any): boolean {
     return Object.values(enumObj).includes(value);
 }

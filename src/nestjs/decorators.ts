@@ -4,7 +4,7 @@ import type { ClassType } from '../core/types';
 /**
  * Metadata keys
  */
-export const USE_MAPPER = Symbol('USE_MAPPER');
+export const USE_MAPPER = Symbol.for('USE_MAPPER');
 export const MAPPER_SOURCE = Symbol('MAPPER_SOURCE');
 export const MAPPER_DESTINATION = Symbol('MAPPER_DESTINATION');
 
@@ -25,10 +25,11 @@ export function UseMapper(mapperClass: ClassType<any>): ClassDecorator {
  * @param sourcePropertyOrType string | class constructor
  */
 export function MapFrom(sourcePropertyOrType: string | ClassType<any>): PropertyDecorator {
-    return (target, propertyKey) => {
-        const existing = Reflect.getMetadata(MAPPER_SOURCE, target.constructor) || {};
-        existing[propertyKey] = sourcePropertyOrType;
-        Reflect.defineMetadata(MAPPER_SOURCE, existing, target.constructor);
+    return (target: Object, propertyKey: string | symbol) => {
+        if (!sourcePropertyOrType) {
+            throw new Error('@MapFrom requires a source property or class type');
+        }
+        Reflect.defineMetadata('mapper:source', sourcePropertyOrType, target, propertyKey);
     };
 }
 
@@ -38,10 +39,11 @@ export function MapFrom(sourcePropertyOrType: string | ClassType<any>): Property
  * @param destinationPropertyOrType string | class constructor
  */
 export function MapTo(destinationPropertyOrType: string | ClassType<any>): PropertyDecorator {
-    return (target, propertyKey) => {
-        const existing = Reflect.getMetadata(MAPPER_DESTINATION, target.constructor) || {};
-        existing[propertyKey] = destinationPropertyOrType;
-        Reflect.defineMetadata(MAPPER_DESTINATION, existing, target.constructor);
+    return (target: Object, propertyKey: string | symbol) => {
+        if (!destinationPropertyOrType) {
+            throw new Error('@MapTo requires a destination property or class type');
+        }
+        Reflect.defineMetadata('mapper:destination', destinationPropertyOrType, target, propertyKey);
     };
 }
 
