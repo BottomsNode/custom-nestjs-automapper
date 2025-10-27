@@ -13,7 +13,8 @@
         "test:coverage": "jest --coverage",
         "lint": "eslint \"src/**/*.ts\"",
         "lint:fix": "eslint --fix \"src/**/*.ts\"",
-        "format": "prettier --write \"src/**/*.ts\""
+        "format": "prettier --write \"src/**/*.ts\"",
+        "release": "npm version patch -m \"Release %s\" && git push origin main --tags"
     },
     "keywords": [
         "automapper",
