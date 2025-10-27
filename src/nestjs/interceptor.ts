@@ -1,7 +1,7 @@
 import { NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { Mapper } from '../core/mapper copy';
+import { Mapper } from '../core/mapper';
 
 export class AutoMapInterceptor<T extends object = any> implements NestInterceptor<T, any> {
     constructor(

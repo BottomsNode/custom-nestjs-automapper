@@ -1,4 +1,4 @@
-import type { Mapper } from '../core/mapper copy';
+import type { Mapper } from '../core/mapper';
 
 export class ArrayMappingStrategy {
     constructor(private mapper: Mapper) {}

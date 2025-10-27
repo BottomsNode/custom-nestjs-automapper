@@ -1,5 +1,5 @@
 import { PipeTransform, Injectable, ArgumentMetadata } from '@nestjs/common';
-import { Mapper } from '../core/mapper copy';
+import { Mapper } from '../core/mapper';
 
 @Injectable()
 export class AutoMapPipe implements PipeTransform {

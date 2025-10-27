@@ -1,5 +1,4 @@
-// Core exports
-export { Mapper } from './core/mapper-new';
+export { Mapper } from './core/mapper';
 export { MappingProfile, MappingBuilder } from './core/mapping-profile';
 export { createMappingContext } from './core/mapping-context';
 export { MappingConfigurator } from './core/mapping-config';

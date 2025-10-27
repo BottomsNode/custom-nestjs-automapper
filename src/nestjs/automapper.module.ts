@@ -1,5 +1,5 @@
 import { DynamicModule, Global, Module, Type } from '@nestjs/common';
-import { Mapper } from '../core/mapper copy';
+import { Mapper } from '../core/mapper';
 import { MappingProfile } from '../core/mapping-profile';
 import type { MappingEntryOptions } from '../core/types';
 import type { CacheConfig } from '../core/types';

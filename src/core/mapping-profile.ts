@@ -1,4 +1,4 @@
-import type { Mapper } from './mapper copy';
+import type { Mapper } from './mapper';
 import type { ClassType, MappingConfig, MappingEntryOptions } from './types';
 
 export class MappingBuilder<S extends object, D extends object> {

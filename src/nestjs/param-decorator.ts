@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { Mapper } from '../core/mapper copy';
+import { Mapper } from '../core/mapper';
 
 /**
  * @MapBody
