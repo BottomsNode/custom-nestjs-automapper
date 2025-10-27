@@ -1,5 +1,4 @@
 name: 📦 Publish Package
-
 on:
   workflow_run:
     workflows: ["🧪 Build and Test"]
@@ -8,7 +7,7 @@ on:
 
 jobs:
   publish:
-    name: 🧩 Build, Publish & Release
+    name: 🧩 Build, Version & Publish
     runs-on: ubuntu-latest
     if: >
       ${{ github.event.workflow_run.conclusion == 'success' &&
@@ -40,20 +39,30 @@ jobs:
       - name: Run tests
         run: yarn test
 
+      # 🚀 Auto bump version, commit, and tag
+      - name: Bump version automatically
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          npm version patch -m "ci: auto bump to %s"
+          git push origin master --tags
+
+      # 🧾 Publish to npm
       - name: Publish to npm
-        if: startsWith(github.event.workflow_run.head_branch, 'master')
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
 
+      # 🧠 Generate changelog
       - name: Generate changelog
         id: changelog
         run: |
-          echo "## Changes in ${{ github.event.workflow_run.head_branch }}" > CHANGELOG.md
-          git log -1 --pretty=format:"- %s (%an)" >> CHANGELOG.md
+          echo "## Changes in $(git describe --tags --abbrev=0)" > CHANGELOG.md
+          git log $(git describe --tags --abbrev=0 @^)..@ --pretty=format:"- %s (%an)" >> CHANGELOG.md
           echo "" >> CHANGELOG.md
           cat CHANGELOG.md
 
+      # 🏷️ Create GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
