@@ -43,7 +43,12 @@ export function MapTo(destinationPropertyOrType: string | ClassType<any>): Prope
         if (!destinationPropertyOrType) {
             throw new Error('@MapTo requires a destination property or class type');
         }
-        Reflect.defineMetadata('mapper:destination', destinationPropertyOrType, target, propertyKey);
+        Reflect.defineMetadata(
+            'mapper:destination',
+            destinationPropertyOrType,
+            target,
+            propertyKey
+        );
     };
 }
 
@@ -70,7 +75,7 @@ export function AutoMap(destination?: ClassType<any>): PropertyDecorator & Class
 /**
  * Helpers to get metadata
  */
-export function getMapperMetadata(target: Function) {
+export function getMapperMetadata(target: new (...args: any[]) => any) {
     return {
         useMapper: Reflect.getMetadata(USE_MAPPER, target),
         sources: Reflect.getMetadata(MAPPER_SOURCE, target) || {},
@@ -78,7 +83,7 @@ export function getMapperMetadata(target: Function) {
     };
 }
 
-export function getAutoMapMetadata(target: Function) {
+export function getAutoMapMetadata(target: new (...args: any[]) => any) {
     const METADATA_KEY = Symbol.for('AUTO_MAP_METADATA');
     return Reflect.getMetadata(METADATA_KEY, target) || {};
 }

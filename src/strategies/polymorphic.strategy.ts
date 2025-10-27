@@ -1,4 +1,4 @@
-import type { Mapper } from '../core/mapper';
+import type { Mapper } from '../core/mapper-new';
 
 export class PolymorphicMappingStrategy {
     constructor(private mapper: Mapper) {}

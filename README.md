@@ -1,4 +1,4 @@
-# @ns/custom-automapper
+# @custom-automapper
 
 A powerful, type-safe object mapping library for TypeScript and NestJS.
 
@@ -54,15 +54,15 @@ To fully match @automapper/core capabilities:
 ## Installation
 
 ```bash
-npm install @ns/custom-automapper
+npm install @custom-automapper
 # or
-yarn add @ns/custom-automapper
+yarn add @custom-automapper
 ```
 
 ## Usage
 
 ```ts
-import { Mapper, AutoMap } from '@ns/custom-automapper';
+import { Mapper, AutoMap } from '@custom-automapper';
 
 // DTOs
 class SourceDTO {

@@ -66,7 +66,9 @@ export function Validate(validator: (value: any) => boolean, errorMessage?: stri
 
         Object.defineProperty(target, propertyKey, {
             get() {
-                return originalDescriptor?.get ? originalDescriptor.get.call(this) : this[`_${propertyKey}`];
+                return originalDescriptor?.get
+                    ? originalDescriptor.get.call(this)
+                    : this[`_${propertyKey}`];
             },
             set(value: any) {
                 if (!validator(value)) {

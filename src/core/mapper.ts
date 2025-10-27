@@ -6,9 +6,20 @@ import type {
     MappingResult,
     ConditionalMapping,
     TransformOptions,
-    ValidationRule} from './types';
+    ValidationRule,
+    MapperConstructorOptions,
+    CacheConfig,
+    MappingContext
+} from './types';
+
 import { deepClone } from '../utils/deep-clone.util';
 import { convertNamingConvention } from '../utils/naming-convention.util';
+import {
+    AUTO_MAP_METADATA_KEY,
+    MAP_NESTED_METADATA_KEY,
+    MAP_PROPERTY_METADATA_KEY,
+    TRANSFORM_METADATA_KEY
+} from '../decorators';
 
 export class Mapper {
     private registry: MappingRegistryEntry<any, any>[] = [];
@@ -16,27 +27,86 @@ export class Mapper {
     private validationRules: Map<string, ValidationRule[]> = new Map();
     private reverseRegistry: Map<string, MappingRegistryEntry<any, any>> = new Map();
 
-    constructor(options?: MappingEntryOptions) {
-        if (options) this.globalOptions = options;
+    // Compiled mappings for performance: registryKey -> compiled sync mapper function
+    private compiledMapFns: Map<string, (src: any, _ctx?: any) => any> = new Map();
+
+    // Compiled async mapping functions
+    private compiledAsyncMapFns: Map<string, (src: any, _ctx?: any) => Promise<any>> = new Map();
+
+    // Instance-level cache: WeakMap<sourceObject, Map<destinationConstructor, mappedResult>>
+    private instanceCache: WeakMap<object, Map<new (...args: any[]) => any, any>> = new WeakMap();
+
+    // Configurable caching plumbing
+    private cacheConfig: CacheConfig;
+
+    constructor(
+        options?: MapperConstructorOptions | (MappingEntryOptions & { cache?: CacheConfig })
+    ) {
+        if (!options) {
+            this.globalOptions = {};
+            this.cacheConfig = { enabled: false, strategy: 'memory' };
+        } else {
+            // Support both shapes: MapperConstructorOptions or MappingEntryOptions with cache
+            const anyOpt = options as any;
+            this.globalOptions = anyOpt.globalOptions ?? (anyOpt as MappingEntryOptions) ?? {};
+            this.cacheConfig = anyOpt.cache ??
+                (anyOpt as any).cache ?? { enabled: false, strategy: 'memory' };
+        }
+    }
+
+    /** Dynamically enable or disable the global cache. */
+    public setCacheEnabled(enabled: boolean): void {
+        if (!this.cacheConfig) this.cacheConfig = {};
+        this.cacheConfig.enabled = enabled;
+    }
+
+    /** Returns the current global cache state. */
+    public isGlobalCacheEnabled(): boolean {
+        return !!this.cacheConfig?.enabled;
+    }
+
+    /**
+     * Determines if cache is active for a given mapping entry.
+     * Gives priority to per-map config over global.
+     */
+    private isCacheEnabled(entry?: MappingRegistryEntry<any, any>): boolean {
+        // 1️⃣ Per-map cache override takes precedence
+        if (entry?.options?.cache?.enabled !== undefined) {
+            return entry.options.cache.enabled;
+        }
+        // 2️⃣ Otherwise, fall back to global config
+        return !!this.cacheConfig?.enabled;
+    }
+
+    /**
+     * Helper method to create property mappings with source path metadata.
+     * Enables automatic reverse mapping generation.
+     */
+    mapFrom<S, K extends keyof S>(sourcePath: K): (src: S) => S[K] {
+        const fn = ((src: S) => src[sourcePath]) as (src: S) => S[K] & { __sourcePath?: keyof S };
+        (fn as any).__sourcePath = sourcePath;
+        return fn;
     }
 
     createMap<S extends object, D extends object>(
         source: ClassType<S>,
         destination: ClassType<D>,
         config?: MappingConfig<S, D>,
-        options?: MappingEntryOptions
+        options?: MappingEntryOptions<S, D>
     ): this {
         const entry: MappingRegistryEntry<S, D> = {
             source,
             destination,
             config,
-            options: { ...this.globalOptions, ...options }
+            options: this.mergeOptions(this.globalOptions, options)
         };
 
         this.registry.push(entry);
-
         const key = this.getRegistryKey(source, destination);
         this.reverseRegistry.set(key, entry);
+
+        // Compile function eagerly for better runtime perf
+        this.compileMapFunction(entry);
 
         return this;
     }
@@ -50,25 +120,58 @@ export class Mapper {
             throw new Error(`No forward mapping found for ${source.name} -> ${destination.name}`);
         }
 
-        const reverseConfig: Partial<MappingConfig<D, S>> = {};
+        const reverseConfig: any = {};
         if (forwardEntry.config) {
-            for (const key in forwardEntry.config) {
-                (reverseConfig as any)[key] = (dest: D) => (dest as any)[key];
+            for (const [destKey, mapperFn] of Object.entries(forwardEntry.config)) {
+                const sourcePath = (mapperFn as any).__sourcePath;
+                if (sourcePath) {
+                    reverseConfig[sourcePath] = (src: D) => (src as any)[destKey];
+                } else {
+                    reverseConfig[destKey] = (src: D) => (src as any)[destKey];
+                }
             }
         }
 
+        const reverseOptions = (forwardEntry.options ?? {}) as unknown as MappingEntryOptions<D, S>;
         return this.createMap(
             destination,
             source,
             reverseConfig as MappingConfig<D, S>,
-            forwardEntry.options
+            reverseOptions
         );
     }
 
+    /** Safely merges two MappingEntryOptions while preserving typing. */
+    private mergeOptions<S extends object, D extends object>(
+        base?: MappingEntryOptions<S, D>,
+        override?: MappingEntryOptions<S, D>
+    ): MappingEntryOptions<S, D> {
+        const merged: MappingEntryOptions<S, D> = { ...(base ?? {}), ...(override ?? {}) };
+
+        if (base?.ignore || override?.ignore) {
+            merged.ignore = Array.from(
+                new Set([...(base?.ignore ?? []), ...(override?.ignore ?? [])])
+            );
+        }
+
+        if (base?.include || override?.include) {
+            merged.include = Array.from(
+                new Set([...(base?.include ?? []), ...(override?.include ?? [])])
+            );
+        }
+
+        if (base?.cache || override?.cache) {
+            merged.cache = { ...(base?.cache ?? {}), ...(override?.cache ?? {}) };
+        }
+
+        return merged;
+    }
+
+    // ---------- SYNC MAP ----------
     map<S extends object, D extends object>(
         sourceObj: S,
         destinationClass: ClassType<D>,
-        options?: TransformOptions
+        _options?: TransformOptions
     ): D {
         const entry = this.findEntry(sourceObj.constructor as ClassType<S>, destinationClass);
         if (!entry) {
@@ -79,27 +182,45 @@ export class Mapper {
             );
         }
 
+        const key = this.getRegistryKey(entry.source, entry.destination);
+
+        if (this.isCacheEnabled(entry)) {
+            const mapForSource = this.instanceCache.get(sourceObj as any);
+            if (mapForSource) {
+                const cached = mapForSource.get(destinationClass);
+                if (cached) return cached as D;
+            }
+        }
+
         try {
-            const destObj = new destinationClass();
-            const mergedOptions = { ...entry.options, ...options };
+            const hooks = entry.options ?? {};
+            let preProcessed = sourceObj;
 
-            let processedSource = sourceObj;
-            if (entry.options?.beforeMap) {
-                processedSource = entry.options.beforeMap(sourceObj) as S;
+            if (typeof hooks.beforeMap === 'function') {
+                preProcessed = (hooks.beforeMap as (src: S) => S)(
+                    hooks.deepCloneBeforeMap ? deepClone(sourceObj) : sourceObj
+                );
             }
 
-            this.copyProperties(processedSource, destObj, mergedOptions);
+            let compiled = this.compiledMapFns.get(key);
+            if (!compiled) compiled = this.compileMapFunction(entry);
 
-            if (entry.config) {
-                this.applyCustomMappings(processedSource, destObj, entry.config, mergedOptions);
+            let result = compiled!(preProcessed);
+
+            if (typeof hooks.afterMap === 'function') {
+                result = (hooks.afterMap as (dest: D) => D)(result);
             }
 
-            let finalDestObj = destObj;
-            if (entry.options?.afterMap) {
-                finalDestObj = entry.options.afterMap(destObj, processedSource) as D;
+            if (this.isCacheEnabled(entry)) {
+                let mapForSource = this.instanceCache.get(sourceObj as any);
+                if (!mapForSource) {
+                    mapForSource = new Map<new (...args: any[]) => any, any>();
+                    this.instanceCache.set(sourceObj as any, mapForSource);
+                }
+                mapForSource.set(destinationClass, result);
             }
 
-            return finalDestObj;
+            return result as D;
         } catch (error) {
             throw this.createMappingError(
                 sourceObj.constructor.name,
@@ -110,46 +231,7 @@ export class Mapper {
         }
     }
 
-    mapWithMetadata<S extends object, D extends object>(
-        sourceObj: S,
-        destinationClass: ClassType<D>,
-        options?: TransformOptions
-    ): MappingResult<D> {
-        const startTime = Date.now();
-        const mappedProperties: string[] = [];
-        const skippedProperties: string[] = [];
-        const errors: Array<{ property: string; error: string }> = [];
-
-        try {
-            const data = this.map(sourceObj, destinationClass, options);
-
-            for (const key in sourceObj) {
-                if (key in data) {
-                    mappedProperties.push(key);
-                } else {
-                    skippedProperties.push(key);
-                }
-            }
-
-            return {
-                data,
-                metadata: {
-                    mappedProperties,
-                    skippedProperties,
-                    errors,
-                    executionTime: Date.now() - startTime
-                }
-            };
-        } catch (error) {
-            errors.push({
-                property: 'all',
-                error: (error as Error).message
-            });
-
-            throw error;
-        }
-    }
-
+    // ---------- ASYNC MAP ----------
     async mapAsync<S extends object, D extends object>(
         sourceObj: S,
         destinationClass: ClassType<D>,
@@ -164,32 +246,77 @@ export class Mapper {
             );
         }
 
-        const destObj = new destinationClass();
+        const key = this.getRegistryKey(entry.source, entry.destination);
 
-        let processedSource = sourceObj;
-        if (entry.options?.beforeMap) {
-            const result = entry.options.beforeMap(sourceObj);
-            processedSource = result instanceof Promise ? await result : result;
+        if (this.isCacheEnabled(entry)) {
+            const mapForSource = this.instanceCache.get(sourceObj as any);
+            if (mapForSource) {
+                const cached = mapForSource.get(destinationClass);
+                if (cached) return cached as D;
+            }
         }
 
-        this.copyProperties(processedSource, destObj, entry.options);
+        const hooks = entry.options ?? {};
+        let preProcessed = sourceObj;
 
-        if (entry.config) {
-            await this.applyAsyncCustomMappings(
-                processedSource,
-                destObj,
-                entry.config,
-                entry.options
+        if (typeof hooks.beforeMap === 'function') {
+            preProcessed = await Promise.resolve(
+                (hooks.beforeMap as (src: S) => S | Promise<S>)(deepClone(sourceObj))
             );
         }
 
-        let finalDestObj = destObj;
-        if (entry.options?.afterMap) {
-            const result = entry.options.afterMap(destObj, processedSource);
-            finalDestObj = result instanceof Promise ? await result : result;
+        let asyncFn = this.compiledAsyncMapFns.get(key);
+        if (!asyncFn) asyncFn = this.compileAsyncMapFunction(entry);
+
+        let result = await asyncFn(preProcessed);
+
+        if (typeof hooks.afterMap === 'function') {
+            result = await Promise.resolve((hooks.afterMap as (dest: D) => D | Promise<D>)(result));
         }
 
-        return finalDestObj;
+        if (this.isCacheEnabled(entry)) {
+            let mapForSource = this.instanceCache.get(sourceObj as any);
+            if (!mapForSource) {
+                mapForSource = new Map<new (...args: any[]) => any, any>();
+                this.instanceCache.set(sourceObj as any, mapForSource);
+            }
+            mapForSource.set(destinationClass, result);
+        }
+
+        return result as D;
+    }
+
+    // ---------- Utility Methods ----------
+    mapWithMetadata<S extends object, D extends object>(
+        sourceObj: S,
+        destinationClass: ClassType<D>,
+        options?: TransformOptions
+    ): MappingResult<D> {
+        const startTime = Date.now();
+        const mappedProperties: string[] = [];
+        const skippedProperties: string[] = [];
+        const errors: Array<{ property: string; error: string }> = [];
+
+        try {
+            const data = this.map(sourceObj, destinationClass, options);
+            for (const key in sourceObj) {
+                if (key in data) mappedProperties.push(key);
+                else skippedProperties.push(key);
+            }
+
+            return {
+                data,
+                metadata: {
+                    mappedProperties,
+                    skippedProperties,
+                    errors,
+                    executionTime: Date.now() - startTime
+                }
+            };
+        } catch (error) {
+            errors.push({ property: 'all', error: (error as Error).message });
+            throw error;
+        }
     }
 
     mapArray<S extends object, D extends object>(
@@ -214,14 +341,11 @@ export class Mapper {
         conditions: ConditionalMapping<S, D>[]
     ): D {
         const destObj = this.map(sourceObj, destinationClass);
-
         for (const { condition, map } of conditions) {
             if (condition(sourceObj)) {
-                const result = map(sourceObj);
-                Object.assign(destObj, result);
+                Object.assign(destObj, map(sourceObj));
             }
         }
-
         return destObj;
     }
 
@@ -239,7 +363,6 @@ export class Mapper {
         for (const key in obj) {
             const ruleKey = `${className}.${key}`;
             const rules = this.validationRules.get(ruleKey);
-
             if (rules) {
                 for (const rule of rules) {
                     const isValid = await Promise.resolve(rule.validate((obj as any)[key]));
@@ -257,6 +380,9 @@ export class Mapper {
         this.registry = [];
         this.reverseRegistry.clear();
         this.validationRules.clear();
+        this.compiledMapFns.clear();
+        this.compiledAsyncMapFns.clear();
+        this.instanceCache = new WeakMap();
     }
 
     getMappings(): Array<{ source: string; destination: string }> {
@@ -266,6 +392,7 @@ export class Mapper {
         }));
     }
 
+    // ---------- PRIVATE HELPERS ----------
     private findEntry<S extends object, D extends object>(
         source: ClassType<S>,
         destination: ClassType<D>
@@ -281,101 +408,223 @@ export class Mapper {
         return `${source.name}->${destination.name}`;
     }
 
-    private copyProperties<S extends object, D extends object>(
-        source: S,
-        dest: D,
-        options?: MappingEntryOptions & TransformOptions
-    ): void {
-        for (const key in source) {
-            if (options?.ignore?.includes(key)) continue;
+    private compileMapFunction<S extends object, D extends object>(
+        entry: MappingRegistryEntry<S, D>
+    ) {
+        const key = this.getRegistryKey(entry.source, entry.destination);
 
-            if (options?.include && !options.include.includes(key)) continue;
+        const compiledFn = (src: any, _ctx?: MappingContext) => {
+            const dest = new (entry.destination as any)();
 
-            if (options?.skipNulls && source[key] === null) continue;
+            // Copy primitives
+            for (const k in src) {
+                if (entry.options?.ignore?.includes?.(k)) continue;
+                if (entry.options?.include && !entry.options.include.includes(k)) continue;
+                if (entry.options?.skipNulls && src[k] === null) continue;
+                if (entry.options?.skipUndefined && src[k] === undefined) continue;
 
-            if (options?.skipUndefined && source[key] === undefined) continue;
+                let targetKey = k;
+                if ((entry.options as any)?.convertNaming) {
+                    targetKey = convertNamingConvention(
+                        k,
+                        (entry.options as any).convertNaming.from,
+                        (entry.options as any).convertNaming.to
+                    ) as string;
+                }
 
-            let targetKey = key;
-
-            if (options?.convertNaming) {
-                targetKey = convertNamingConvention(
-                    key,
-                    options.convertNaming.from,
-                    options.convertNaming.to
-                ) as Extract<keyof S, string>;
+                if (targetKey in dest) {
+                    dest[targetKey] = entry.options?.deepClone ? deepClone(src[k]) : src[k];
+                }
             }
 
-            if (targetKey in dest) {
-                const value = source[key];
-                (dest as any)[targetKey] = options?.deepClone ? deepClone(value) : value;
-            }
-        }
-    }
-
-    private applyCustomMappings<S extends object, D extends object>(
-        source: S,
-        dest: D,
-        config: MappingConfig<S, D>,
-        options?: MappingEntryOptions
-    ): void {
-        for (const destKey in config) {
-            const mapperFn = config[destKey];
-            if (typeof mapperFn === 'function') {
-                try {
-                    const value = mapperFn(source);
-
-                    if (options?.skipNulls && value === null) continue;
-                    if (options?.skipUndefined && value === undefined) continue;
-
-                    (dest as any)[destKey] = value;
-                } catch (error) {
-                    if (options?.strict) {
-                        throw error;
+            // Apply configured mapping functions
+            if (entry.config) {
+                for (const destKey in entry.config) {
+                    const mapperFn = (entry.config as any)[destKey];
+                    try {
+                        const value = mapperFn(src);
+                        if (entry.options?.skipNulls && value === null) continue;
+                        if (entry.options?.skipUndefined && value === undefined) continue;
+                        dest[destKey] = value;
+                    } catch (err) {
+                        if (entry.options?.strict) throw err;
                     }
                 }
             }
-        }
-    }
 
-    private async applyAsyncCustomMappings<S extends object, D extends object>(
-        source: S,
-        dest: D,
-        config: MappingConfig<S, D>,
-        options?: MappingEntryOptions
-    ): Promise<void> {
-        for (const destKey in config) {
-            const mapperFn = config[destKey];
-            if (typeof mapperFn === 'function') {
-                try {
-                    const value = await Promise.resolve(mapperFn(source));
+            // Decorator-driven mappings
+            const autoMeta = (Reflect.getMetadata(AUTO_MAP_METADATA_KEY, entry.destination) ||
+                {}) as Record<string, any>;
 
-                    if (options?.skipNulls && value === null) continue;
-                    if (options?.skipUndefined && value === undefined) continue;
+            for (const destKey of Object.keys(autoMeta)) {
+                if ((entry.config && (entry.config as any)[destKey]) || dest[destKey] !== undefined)
+                    continue;
 
-                    (dest as any)[destKey] = value;
-                } catch (error) {
-                    if (options?.strict) {
-                        throw error;
+                const nestedTypeFactory = Reflect.getMetadata(
+                    MAP_NESTED_METADATA_KEY,
+                    entry.destination.prototype,
+                    destKey
+                );
+
+                const sourcePath = Reflect.getMetadata(
+                    MAP_PROPERTY_METADATA_KEY,
+                    entry.destination.prototype,
+                    destKey
+                );
+
+                const transformer = Reflect.getMetadata(
+                    TRANSFORM_METADATA_KEY,
+                    entry.destination.prototype,
+                    destKey
+                );
+
+                if (sourcePath) {
+                    const parts = (sourcePath as string).split('.');
+                    let val: any = src;
+                    for (const p of parts) val = val?.[p];
+                    dest[destKey] = transformer ? transformer(val, src) : val;
+                } else if (nestedTypeFactory) {
+                    const nestedType = nestedTypeFactory();
+                    const nestedVal = src[destKey];
+
+                    if (nestedVal === undefined || nestedVal === null) {
+                        dest[destKey] = nestedVal;
+                    } else if (Array.isArray(nestedVal)) {
+                        dest[destKey] = nestedVal.map((it: any) => this.map(it, nestedType));
+                    } else {
+                        dest[destKey] = this.map(nestedVal, nestedType);
+                    }
+                } else {
+                    if (destKey in src) {
+                        const val = src[destKey];
+                        dest[destKey] = transformer ? transformer(val, src) : val;
                     }
                 }
             }
-        }
+
+            return dest;
+        };
+
+        this.compiledMapFns.set(key, compiledFn);
+        return compiledFn;
     }
 
+    private compileAsyncMapFunction<S extends object, D extends object>(
+        entry: MappingRegistryEntry<S, D>
+    ) {
+        const key = this.getRegistryKey(entry.source, entry.destination);
+
+        const asyncFn = async (src: any, _ctx?: any) => {
+            const dest = new (entry.destination as any)();
+
+            // Copy primitives
+            for (const k in src) {
+                if (entry.options?.ignore?.includes?.(k)) continue;
+                if (entry.options?.include && !entry.options.include.includes(k)) continue;
+                if (entry.options?.skipNulls && src[k] === null) continue;
+                if (entry.options?.skipUndefined && src[k] === undefined) continue;
+
+                let targetKey = k;
+                if ((entry.options as any)?.convertNaming) {
+                    targetKey = convertNamingConvention(
+                        k,
+                        (entry.options as any).convertNaming.from,
+                        (entry.options as any).convertNaming.to
+                    ) as string;
+                }
+
+                if (targetKey in dest) {
+                    dest[targetKey] = entry.options?.deepClone ? deepClone(src[k]) : src[k];
+                }
+            }
+
+            // Config functions may be async
+            if (entry.config) {
+                for (const destKey in entry.config) {
+                    const mapperFn = (entry.config as any)[destKey];
+                    try {
+                        const value = await Promise.resolve(mapperFn(src));
+                        if (entry.options?.skipNulls && value === null) continue;
+                        if (entry.options?.skipUndefined && value === undefined) continue;
+                        dest[destKey] = value;
+                    } catch (err) {
+                        if (entry.options?.strict) throw err;
+                    }
+                }
+            }
+
+            // Decorator-driven mappings
+            const autoMeta = (Reflect.getMetadata(AUTO_MAP_METADATA_KEY, entry.destination) ||
+                {}) as Record<string, any>;
+
+            for (const destKey of Object.keys(autoMeta)) {
+                if ((entry.config && (entry.config as any)[destKey]) || dest[destKey] !== undefined)
+                    continue;
+
+                const nestedTypeFactory = Reflect.getMetadata(
+                    MAP_NESTED_METADATA_KEY,
+                    entry.destination.prototype,
+                    destKey
+                );
+
+                const sourcePath = Reflect.getMetadata(
+                    MAP_PROPERTY_METADATA_KEY,
+                    entry.destination.prototype,
+                    destKey
+                );
+
+                const transformer = Reflect.getMetadata(
+                    TRANSFORM_METADATA_KEY,
+                    entry.destination.prototype,
+                    destKey
+                );
+
+                if (sourcePath) {
+                    const parts = (sourcePath as string).split('.');
+                    let val: any = src;
+                    for (const p of parts) val = val?.[p];
+                    dest[destKey] = transformer ? transformer(val, src) : val;
+                } else if (nestedTypeFactory) {
+                    const nestedType = nestedTypeFactory();
+                    const nestedVal = src[destKey];
+
+                    if (nestedVal === undefined || nestedVal === null) {
+                        dest[destKey] = nestedVal;
+                    } else if (Array.isArray(nestedVal)) {
+                        dest[destKey] = await Promise.all(
+                            nestedVal.map(async (it: any) => this.mapAsync(it, nestedType))
+                        );
+                    } else {
+                        dest[destKey] = await this.mapAsync(nestedVal, nestedType);
+                    }
+                } else {
+                    if (destKey in src) {
+                        const val = src[destKey];
+                        dest[destKey] = transformer ? transformer(val, src) : val;
+                    }
+                }
+            }
+
+            return dest;
+        };
+
+        this.compiledAsyncMapFns.set(key, asyncFn);
+        return asyncFn;
+    }
+
+    // ---------- Error Builder ----------
     private createMappingError(
-        source: string,
-        destination: string,
+        sourceType: string,
+        destinationType: string,
         message: string,
         originalError?: Error
     ): Error {
-        const error = new Error(
-            `Mapping Error: ${source} -> ${destination}: ${message}${
-                originalError ? ` (${originalError.message})` : ''
+        const err = new Error(
+            `Mapping Error [${sourceType} → ${destinationType}]: ${message}${
+                originalError ? ` | Cause: ${originalError.message}` : ''
             }`
         );
-        (error as any).source = source;
-        (error as any).destination = destination;
-        (error as any).originalError = originalError;
-        return error;
+        (err as any).originalError = originalError;
+        return err;
     }
 }

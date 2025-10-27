@@ -1,28 +1,44 @@
+/** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
     preset: 'ts-jest',
     testEnvironment: 'node',
-    roots: [
-        '<rootDir>/src',
-        '<rootDir>/__tests__'   // include your test folders
-    ],
+
+    // Define roots for test discovery
+    roots: ['<rootDir>/src'],
+
+    // Match common test patterns
     testMatch: [
-        '**/__tests__/**/*.ts',        // matches all tests inside __tests__
-        '**/?(*.)+(spec|test).ts'     // matches *.spec.ts or *.test.ts anywhere
+        '**/__tests__/**/*.spec.ts',
+        '**/?(*.)+(spec|test).ts',
     ],
+
+    // TS transformation pipeline
     transform: {
-        '^.+\\.ts$': 'ts-jest'
+        '^.+\\.ts$': [
+            'ts-jest',
+            {
+                tsconfig: 'tsconfig.json',
+            },
+        ],
     },
-    collectCoverageFrom: [
-        'src/**/*.ts',
-        '!src/**/*.d.ts',
-        '!src/**/*.spec.ts',
-        '!src/**/__tests__/**'
-    ],
-    coverageDirectory: 'coverage',
-    coverageReporters: ['text', 'lcov', 'html'],
-    moduleNameMapper: {
-        '^@/(.*)$': '<rootDir>/src/$1'
-    },
-    // Optional: make watch mode work even if you are not in a git repo
-    watchPathIgnorePatterns: ['node_modules', 'dist', 'coverage']
-};
+
+        // Coverage configuration
+        collectCoverageFrom: [
+            'src/**/*.ts',
+            '!src/**/*.d.ts',
+            '!src/**/__tests__/**',
+        ],
+        coverageDirectory: 'coverage',
+        coverageReporters: ['text', 'lcov', 'html'],
+
+        // Module aliases
+        moduleNameMapper: {
+            '^@/(.*)$': '<rootDir>/src/$1',
+        },
+
+        // Ignored paths for watch mode
+        watchPathIgnorePatterns: ['node_modules', 'dist', 'coverage'],
+
+        // More readable output
+        verbose: true,
+    };

@@ -1,4 +1,4 @@
-import type { Mapper } from './mapper';
+import type { Mapper } from './mapper copy';
 import type { ClassType, MappingConfig, MappingEntryOptions } from './types';
 
 export class MappingBuilder<S extends object, D extends object> {
@@ -11,18 +11,12 @@ export class MappingBuilder<S extends object, D extends object> {
         private destination: ClassType<D>
     ) {}
 
-    forMember<K extends keyof D>(
-        destinationKey: K,
-        mapperFn: (source: S) => D[K]
-    ): this {
+    forMember<K extends keyof D>(destinationKey: K, mapperFn: (source: S) => D[K]): this {
         this.config[destinationKey] = mapperFn as any;
         return this;
     }
 
-    forPath<K extends keyof D>(
-        destinationKey: K,
-        sourcePath: string
-    ): this {
+    forPath<K extends keyof D>(destinationKey: K, sourcePath: string): this {
         this.config[destinationKey] = ((source: S) => {
             const path = sourcePath.split('.');
             let value: any = source;
@@ -46,9 +40,11 @@ export class MappingBuilder<S extends object, D extends object> {
         falseMapper?: (source: S) => D[K]
     ): this {
         this.config[destinationKey] = ((source: S) => {
-            return condition(source) 
-                ? trueMapper(source) 
-                : (falseMapper ? falseMapper(source) : undefined);
+            return condition(source)
+                ? trueMapper(source)
+                : falseMapper
+                  ? falseMapper(source)
+                  : undefined;
         }) as any;
         return this;
     }

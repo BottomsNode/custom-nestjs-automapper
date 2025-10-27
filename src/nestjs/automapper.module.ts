@@ -1,12 +1,14 @@
 import { DynamicModule, Global, Module, Type } from '@nestjs/common';
-import { Mapper } from '../core/mapper';
+import { Mapper } from '../core/mapper copy';
 import { MappingProfile } from '../core/mapping-profile';
-import { MappingEntryOptions } from '../core/types';
+import type { MappingEntryOptions } from '../core/types';
+import type { CacheConfig } from '../core/types';
 
 export interface AutomapperModuleOptions {
     globalOptions?: MappingEntryOptions;
     profiles?: Type<MappingProfile>[];
     autoDiscover?: boolean;
+    cache?: CacheConfig;
 }
 
 @Global()
@@ -16,7 +18,11 @@ export class AutomapperModule {
         const mapperProvider = {
             provide: Mapper,
             useFactory: () => {
-                const mapper = new Mapper(options?.globalOptions);
+                // Mapper constructor should accept an options bag that may include cache config.
+                const mapper = new Mapper({
+                    ...(options?.globalOptions || {}),
+                    cache: options?.cache
+                } as any);
 
                 if (options?.profiles) {
                     options.profiles.forEach(ProfileClass => {
@@ -28,11 +34,12 @@ export class AutomapperModule {
             }
         };
 
-        const profileProviders = options?.profiles?.map(ProfileClass => ({
-            provide: ProfileClass,
-            useFactory: (mapper: Mapper) => new ProfileClass(mapper),
-            inject: [Mapper]
-        })) || [];
+        const profileProviders =
+            options?.profiles?.map(ProfileClass => ({
+                provide: ProfileClass,
+                useFactory: (mapper: Mapper) => new ProfileClass(mapper),
+                inject: [Mapper]
+            })) || [];
 
         return {
             module: AutomapperModule,

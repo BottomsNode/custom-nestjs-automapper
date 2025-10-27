@@ -1,4 +1,4 @@
-import 'reflect-metadata'
+import 'reflect-metadata';
 
 export const MAPPABLE_CLASS_METADATA_KEY = Symbol('MAPPABLE_CLASS_METADATA');
 

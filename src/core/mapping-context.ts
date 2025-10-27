@@ -13,6 +13,6 @@ export function createMappingContext(
         destination,
         parent,
         depth: parent ? (parent.depth ?? 0) + 1 : 0,
-        options: {},
+        options: {}
     };
 }
