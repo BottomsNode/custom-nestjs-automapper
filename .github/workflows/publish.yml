@@ -36,8 +36,8 @@ jobs:
       # 🚀 Auto bump version, commit, and tag
       - name: Bump version automatically
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
+          git config user.name "Nishit Shivdasani"
+          git config user.email "mysocialmailexpress@gmail.com"
           npm version patch -m "ci: auto bump to %s"
           git push origin master --tags
 
