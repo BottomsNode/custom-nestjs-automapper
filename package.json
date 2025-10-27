@@ -14,7 +14,7 @@
         "lint": "eslint \"src/**/*.ts\"",
         "lint:fix": "eslint --fix \"src/**/*.ts\"",
         "format": "prettier --write \"src/**/*.ts\"",
-        "release": "npm version patch -m \"Release %s\" && git push origin main --tags"
+        "release": "npm version patch -m \"Release %s\" && git push origin main --tags && npm publish --access public"
     },
     "keywords": [
         "automapper",
@@ -37,8 +37,8 @@
         "url": "https://github.com/BottomsNode/custom-automapper/issues"
     },
     "peerDependencies": {
-        "@nestjs/common": "^10.0.0",
-        "@nestjs/core": "^10.0.0",
+        "@nestjs/common": "^10.0.0 || ^11.0.0",
+        "@nestjs/core": "^10.0.0 || ^11.0.0",
         "reflect-metadata": "^0.1.13 || ^0.2.0",
         "rxjs": "^7.0.0"
     },
@@ -58,9 +58,9 @@
     },
     "devDependencies": {
         "@eslint/js": "^9.38.0",
-        "@nestjs/common": "^10.0.0",
-        "@nestjs/core": "^10.0.0",
-        "@nestjs/testing": "^10.0.0",
+        "@nestjs/common": "^11.0.0",
+        "@nestjs/core": "^11.0.0",
+        "@nestjs/testing": "^11.0.0",
         "@types/jest": "^30.0.0",
         "@types/node": "^20.0.0",
         "@types/supertest": "^6.0.3",
