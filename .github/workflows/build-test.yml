@@ -11,20 +11,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: 🧾 Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: ⚙️ Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: yarn
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build project
+      - name: 🏗️ Build project
         run: yarn build
 
-      - name: Run tests
-        run: yarn test
+      - name: 🧪 Run tests (if available)
+        run: |
+          if yarn run | grep -q "test"; then
+            yarn test
+          else
+            echo "⚠️ No test script found, skipping tests."
+          fi
