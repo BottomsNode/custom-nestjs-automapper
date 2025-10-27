@@ -1,14 +1,18 @@
-name: Publish Package
+name: 📦 Publish Package
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_run:
+    workflows: ["🧪 Build and Test"]
+    types:
+      - completed
 
 jobs:
   publish:
     name: 🧩 Build, Publish & Release
     runs-on: ubuntu-latest
+    if: >
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          startsWith(github.event.workflow_run.head_branch, 'master') }}
 
     permissions:
       contents: write
@@ -17,6 +21,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -35,6 +41,7 @@ jobs:
         run: yarn test
 
       - name: Publish to npm
+        if: startsWith(github.event.workflow_run.head_branch, 'master')
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
@@ -42,8 +49,8 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          echo "## Changes in ${{ github.ref_name }}" > CHANGELOG.md
-          git log $(git describe --tags --abbrev=0 @^)..@ --pretty=format:"- %s (%an)" >> CHANGELOG.md
+          echo "## Changes in ${{ github.event.workflow_run.head_branch }}" > CHANGELOG.md
+          git log -1 --pretty=format:"- %s (%an)" >> CHANGELOG.md
           echo "" >> CHANGELOG.md
           cat CHANGELOG.md
 
