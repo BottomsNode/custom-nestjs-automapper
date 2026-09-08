@@ -47,3 +47,7 @@ export { children, walk, isNodeAsync, isNodeGated } from './plan/node.js';
 // --- lowering (AD-12, AD-13) ---
 export type { MappingPlan, PlanResult } from './plan/planner.js';
 export { buildPlan, planKey } from './plan/planner.js';
+
+// --- codegen back-end (AD-3) ---
+export type { CompiledPlan } from './emit/codegen.js';
+export { compile } from './emit/codegen.js';
