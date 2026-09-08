@@ -19,3 +19,31 @@ export { auto, from, compute, resolve, constant, ignore, visible } from './dto/r
 
 export type { DtoClass, DtoStatics, AsyncBrand } from './dto/pick.js';
 export { Pick, extend, isDtoClass, FIELDS, RESOLVERS, SOURCE } from './dto/pick.js';
+
+// --- descriptors & adapter arbitration (AD-17) ---
+export { AdapterRegistry, dtoAdapter } from './descriptor/registry.js';
+
+// --- diagnostics (AD-5) ---
+export { AutomapperError, fail, nearest } from './diagnose/automapper-error.js';
+export type { ErrorCode, ErrorPayloads, Origin } from './diagnose/error-codes.js';
+export { ERROR_HEADLINE } from './diagnose/error-codes.js';
+
+// --- the IR (AD-2) ---
+export type {
+  ResolutionNode,
+  NodeKind,
+  NodeFacts,
+  CopyNode,
+  ComputeNode,
+  ResolveNode,
+  ConstantNode,
+  IgnoreNode,
+  NestedNode,
+  CollectionNode,
+  GatedNode,
+} from './plan/node.js';
+export { children, walk, isNodeAsync, isNodeGated } from './plan/node.js';
+
+// --- lowering (AD-12, AD-13) ---
+export type { MappingPlan, PlanResult } from './plan/planner.js';
+export { buildPlan, planKey } from './plan/planner.js';
