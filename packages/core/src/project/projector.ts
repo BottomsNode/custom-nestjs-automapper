@@ -1,14 +1,9 @@
 /**
  * Projection back-end (AD-10) — CAP-5.
  *
- * Walks the plan and unions the declared deps of every node into a neutral
- * `FieldSelection`. It never inspects the destination class, the registry, or
- * adapter metadata: the plan already carries everything (AD-1).
- *
- * This is why deps are declared rather than inferred. `fullName` is computed
- * from `firstName` and `lastName`, and no amount of looking at the destination
- * would reveal that — a projector that guessed would under-fetch and the field
- * would silently resolve to "undefined undefined".
+ * Unions each node's declared deps into a neutral selection. Deps are declared
+ * rather than inferred because a computed field's source columns are invisible
+ * from the destination shape.
  */
 
 import type { FieldSelection } from '../descriptor/types.js';

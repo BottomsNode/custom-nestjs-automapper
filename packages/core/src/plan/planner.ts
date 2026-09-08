@@ -1,13 +1,9 @@
 /**
- * Lowering: descriptors + declared resolvers → `MappingPlan` (AD-13, AD-12).
+ * Lowering: descriptors + resolvers → `MappingPlan` (AD-12, AD-13).
  *
- * `buildPlan` never throws for a mapping-content defect — it returns every
- * diagnostic at once, because CAP-4 promises an aggregate report and
- * throw-on-first cannot produce one. It still throws immediately for
- * structural defects that make planning impossible at all.
- *
- * A returned plan is TOTAL: every destination field has a resolvable node, and
- * there is no `'unresolved'` kind, so no back-end needs an arm for broken input.
+ * Returns aggregated diagnostics for mapping-content defects, since CAP-4
+ * promises a full report. Throws only for structural defects. A returned plan
+ * is total — there is no `unresolved` kind for back-ends to handle.
  */
 
 import type { AdapterRegistry } from '../descriptor/registry.js';

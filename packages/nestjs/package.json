@@ -44,7 +44,8 @@
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "reflect-metadata": "catalog:",
-    "rxjs": "catalog:"
+    "rxjs": "catalog:",
+    "@nestjs/testing": "catalog:"
   },
   "publishConfig": {
     "access": "public"

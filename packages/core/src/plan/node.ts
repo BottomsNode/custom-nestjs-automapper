@@ -1,19 +1,8 @@
 /**
- * The IR (AD-2).
+ * The IR (AD-2). Closed union on `kind`; back-ends switch exhaustively.
  *
- * `ResolutionNode` is a CLOSED discriminated union on `kind`. Every back-end
- * switches exhaustively with a `never` check and no `default` arm. Adding a
- * kind is a breaking change to core and must update every back-end in the same
- * commit.
- *
- * Exhaustiveness over `kind` is necessary and NOT sufficient — a back-end can
- * satisfy `never` and still drop a field by returning nothing for a wrapper
- * kind. `children()` plus the leaf-coverage obligation is the other half.
- *
- * AD-1's compensating clause is why these nodes are fat: back-ends are denied
- * descriptors, so the planner denormalises onto each node every descriptor-
- * derived fact any back-end needs. A back-end missing a fact is a planner
- * defect, never a licence to reach across.
+ * Nodes are fat on purpose: back-ends may not read descriptors (AD-1), so the
+ * planner denormalises onto each node every fact they need.
  */
 
 import type { ClassLike, FieldKind, Provenance } from '../descriptor/types.js';

@@ -1,11 +1,6 @@
 /**
- * The single error type (AD-5).
- *
- * Message rendering lives here and nowhere else. Adapters and integration
- * packages never throw a raw `Error` and never assemble message text — they
- * contribute structured data and `core` renders it. That is what makes CAP-4's
- * promise ("diagnosable from the error text alone") enforceable rather than a
- * convention each package reinterprets.
+ * The single error type (AD-5). Rendering lives here and nowhere else, so
+ * CAP-4's promise holds instead of each package reinterpreting it.
  */
 
 import type { ClassLike } from '../descriptor/types.js';

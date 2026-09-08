@@ -55,3 +55,7 @@ export { compile } from './emit/codegen.js';
 // --- projection back-end (AD-10) ---
 export { projectionFor, mergeSelection, EMPTY_SELECTION } from './project/projector.js';
 export type { ProjectOptions } from './project/projector.js';
+
+// --- facade ---
+export { Mapper } from './mapper.js';
+export type { PlanReport, MapOptions } from './mapper.js';

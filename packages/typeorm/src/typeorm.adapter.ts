@@ -1,13 +1,9 @@
 /**
- * TypeORM schema adapter — the first front-end (AD-1, AD-14).
+ * TypeORM schema adapter (AD-1, AD-14).
  *
- * `describe()` returns EVERYTHING the schema declares and applies no policy.
- * Filtering belongs to the planner alone: an adapter that dropped
- * `select: false` columns here would make `password` unmappable even when a
- * write DTO legitimately needs it, and an adapter that kept its own drop list
- * would leak a generated column the moment a second adapter disagreed.
- *
- * Verified against typeorm@1.1.1's published type definitions.
+ * `describe()` returns everything the schema declares and applies no policy:
+ * filtering here would make `password` unmappable, and a private drop list
+ * would leak a generated column. Verified against typeorm@1.1.1.
  */
 
 import type {
