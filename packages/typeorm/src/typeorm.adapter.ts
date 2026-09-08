@@ -53,7 +53,8 @@ export function typeorm(dataSource: DataSource): SchemaAdapter {
       };
     },
 
-    toNativeProjection: (selection: FieldSelection): TypeOrmProjection => toFindOptions(selection),
+    toNativeProjection: (selection: FieldSelection, type: ClassLike): TypeOrmProjection =>
+      toFindOptions(selection, dataSource.getMetadata(type as never).primaryColumns.map((c) => c.propertyName)),
   };
 }
 
@@ -146,9 +147,17 @@ function toFieldKind(column: ColumnMetadata): FieldKind {
  * reason `core` stays zero-dependency: it knows nothing about `select` or
  * `relations`, and a second ORM is a second function like this one.
  */
-export function toFindOptions(selection: FieldSelection): TypeOrmProjection {
+export function toFindOptions(
+  selection: FieldSelection,
+  primaryKeys: readonly string[] = [],
+): TypeOrmProjection {
   const select: Record<string, unknown> = {};
   for (const field of selection.fields) select[field] = true;
+
+  // TypeORM needs the primary key to hydrate relations and to dedupe rows, so
+  // it is added here rather than in the neutral selection — core reports what
+  // the DTO consumes, the adapter adds what the ORM requires.
+  for (const key of primaryKeys) select[key] = true;
 
   const relations: Record<string, unknown> = {};
   for (const [name, child] of Object.entries(selection.relations)) {
