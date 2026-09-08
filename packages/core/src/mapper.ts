@@ -4,7 +4,9 @@ import { AutomapperError, fail } from './diagnose/automapper-error.js';
 import { isWriteDto } from './dto/pick.js';
 import { compile, type CompiledPlan } from './emit/codegen.js';
 import { buildPlan, type MappingPlan } from './plan/planner.js';
+import { writeDropReason } from './policy.js';
 import { projectionFor, type ProjectOptions } from './project/projector.js';
+import { schemaOf, type OpenApiSchema, type SchemaOptions } from './schema/openapi.js';
 
 export interface PlanReport {
   readonly ok: boolean;
@@ -120,6 +122,33 @@ export class Mapper<Ctx = unknown> {
       throw fail('NO_ADAPTER', { type: plan.source, registered: this.registry.names() });
     }
     return adapter.toNativeProjection(projectionFor(plan, options), plan.source);
+  }
+
+  /** OpenAPI schema for a DTO (CAP-9). */
+  schemaOf(dto: ClassLike, options: SchemaOptions = {}): OpenApiSchema {
+    return schemaOf(this.planFor(dto, 'schemaOf'), options);
+  }
+
+  /**
+   * Which of a DTO's source fields a client may supply, and why the rest are
+   * refused (CAP-8).
+   *
+   * Returns names rather than a generated class: a DTO's static type has to
+   * exist at declaration time, so a class built at seal could never be typed.
+   * Emitting a typed write DTO needs the CLI codegen path.
+   */
+  reverseOf(dto: ClassLike): { writable: string[]; dropped: Array<{ field: string; reason: string }> } {
+    const plan = this.planFor(dto, 'reverseOf');
+    const fields = this.registry.describe(plan.source).fields;
+    const dropped: Array<{ field: string; reason: string }> = [];
+    const writable: string[] = [];
+
+    for (const field of fields) {
+      const reason = writeDropReason(field);
+      if (reason) dropped.push({ field: field.name, reason });
+      else writable.push(field.name);
+    }
+    return { writable, dropped };
   }
 
   planOf(dto: ClassLike): MappingPlan | undefined {
