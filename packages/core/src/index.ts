@@ -69,3 +69,6 @@ export type { OpenApiSchema, SchemaOptions, OpenApiVersion } from './schema/open
 export { nested, collection } from './dto/resolver.js';
 export { newOpState, MAX_DEPTH } from './emit/codegen.js';
 export type { OpState, ChildLookup } from './emit/codegen.js';
+export { defaultTo } from './dto/resolver.js';
+export type { TypeConverters } from './emit/codegen.js';
+export type { MapperOptions } from './mapper.js';

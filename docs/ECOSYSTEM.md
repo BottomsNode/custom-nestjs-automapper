@@ -124,32 +124,41 @@ Unchanged by this analysis, and still the reason to switch:
 
 ---
 
-## 4. Revised plan
+## 4. Plan status
 
-Four items enter the roadmap; two are deferred.
+Everything scheduled is done.
 
-| # | Item | Why | Lands |
-|---|---|---|---|
-| 1 | ~~Write path~~ | Done — `Write()`, `mapInput`, `MapBodyPipe`. | ✅ Phase 6 |
-| 2 | ~~`forRootAsync`~~ | Done (`useFactory` + `inject`). | ✅ Phase 6 |
-| 3 | ~~Named mappers~~ | Done. | ✅ Phase 9 |
-| 4 | ~~`isGetterOnly`~~ | Refused — unsafe under projection. | ❌ by design |
-| — | `defineSchema()` / `TypeToken` | Deferred with Prisma — see §1. | 2.1 |
-| — | Proxy unwrapping | Deferred with the ORMs that need it. | post-2.0 |
+| # | Item | Status |
+|---|---|---|
+| 1 | Write path — `mapInput` / `MapBodyPipe` | ✅ Phase 6 |
+| 2 | `forRootAsync` (+ `useClass`/`useExisting`) | ✅ Phase 6 / gap pass |
+| 3 | Named mappers (`getMapperToken`) | ✅ Phase 9 |
+| 4 | `isGetterOnly` | ❌ refused — unsafe under projection |
+| 5 | `defaultTo`, type converters | ✅ Phase 10 |
+| — | `defineSchema()` / `TypeToken` | deferred with Prisma — §1 |
+| — | Proxy unwrapping | deferred with the ORMs that need it |
 
-Deliberately **not** adopted: `dispose()` (no global mutable registry to
-release), and `globalNamingConventions` (AD-15 gives conversion exactly one
-owner — the adapter).
+### Refused, with reasons
+
+- **`beforeMap` / `afterMap`** — a hook for something the caller does in one
+  line either side of the call. It buys indirection, not capability.
+- **`constructUsing`** — the DTO constructor is generated and must assign every
+  declared key (AD-19). A user-supplied constructor would silently reintroduce
+  the v1 empty-object defect.
+- **`dispose()`** — nothing to release; there is no global mutable registry.
+- **`globalNamingConventions`** — AD-15 gives conversion exactly one owner.
+- **`isGetterOnly`** — see above.
 
 ### Where the write path lands
 
-`reverse()` already derives the drop list from provenance. The pipe is that
-same computation applied to input, and it does something `MapPipe` cannot:
+`Write(User, [...])` marks the direction; the planner rejects a
+database-owned field at seal, and `mapInput` rejects one arriving in a
+request body.
 
 ```ts
 @Post()
-create(@Body(MapDtoPipe(CreateUserDto)) user: User) { … }
-// A client sending `id` or `createdAt` is rejected — the database owns them.
+create(@Body() dto: CreateUserDto) { … }
+// A client sending `id` or `createdAt` gets a 400 — the database owns them.
 ```
 
 `MapPipe` maps whatever it is given. Ours knows which fields the client is not
