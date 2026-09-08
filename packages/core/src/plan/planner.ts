@@ -186,6 +186,39 @@ function lowerResolver(
       return { kind: 'constant', field, value: resolver.constant, deps: [], facts };
     case 'ignore':
       return { kind: 'ignore', field, deps: [], facts };
+    case 'nested':
+    case 'collection': {
+      const target = resolver.target?.() as ClassLike | undefined;
+      if (!target) return undefined;
+
+      // The relation defaults to the destination field name; `deps` only
+      // carries a path when the two differ.
+      const relPath = resolver.deps[0] ?? field;
+      const relation = lowerPath(relPath, sourceDesc, registry);
+      if (!relation) {
+        diagnostics.push(
+          fail('DEP_UNKNOWN', {
+            destType: dest,
+            sourceType: sourceDesc.type,
+            field,
+            path: relPath,
+            adapter: sourceDesc.producedBy,
+            nameCandidates: sourceDesc.relations.map((r) => r.name),
+          }),
+        );
+        return undefined;
+      }
+      const relMeta = sourceDesc.relations.find((r) => r.name === relPath);
+      return {
+        kind: resolver.kind,
+        field,
+        target,
+        relation,
+        deps: [relation],
+        facts: { type: 'unknown', nullable: relMeta?.nullable ?? true, producedBy: sourceDesc.producedBy },
+      };
+    }
+
     case 'gated': {
       const inner = resolver.child;
       if (!inner || !resolver.predicate) return undefined;

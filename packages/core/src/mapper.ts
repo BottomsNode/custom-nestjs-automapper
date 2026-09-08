@@ -2,7 +2,8 @@ import { AdapterRegistry } from './descriptor/registry.js';
 import type { ClassLike, FieldSelection, SchemaAdapter } from './descriptor/types.js';
 import { AutomapperError, fail } from './diagnose/automapper-error.js';
 import { isWriteDto } from './dto/pick.js';
-import { compile, type CompiledPlan } from './emit/codegen.js';
+import { compile, newOpState, type ChildLookup, type CompiledPlan } from './emit/codegen.js';
+import { isNodeAsync } from './plan/node.js';
 import { buildPlan, type MappingPlan } from './plan/planner.js';
 import { writeDropReason } from './policy.js';
 import { projectionFor, type ProjectOptions } from './project/projector.js';
@@ -44,22 +45,77 @@ export class Mapper<Ctx = unknown> {
     return this;
   }
 
-  /** Builds every plan. Returns diagnostics; the caller decides process lifetime (AD-8). */
+  /**
+   * Builds every plan, then closes over the DTOs their relations reference
+   * (CAP-6) so a nested pair never has to be registered by hand.
+   *
+   * Returns diagnostics; the caller decides process lifetime (AD-8).
+   */
   seal(): PlanReport {
     const diagnostics: AutomapperError[] = [];
+    const queue = [...this.declared];
 
-    for (const dto of this.declared) {
+    while (queue.length > 0) {
+      const dto = queue.shift()!;
+      if (this.plans.has(dto)) continue;
+
       const result = buildPlan(dto, this.registry);
-      if (result.ok) this.plans.set(dto, result.plan);
-      else diagnostics.push(...result.diagnostics);
+      if (!result.ok) {
+        diagnostics.push(...result.diagnostics);
+        continue;
+      }
+      this.plans.set(dto, result.plan);
+
+      // Auto-registration happens here and nowhere else (AD-16).
+      for (const node of result.plan.nodes) {
+        if (node.kind === 'nested' || node.kind === 'collection') queue.push(node.target);
+      }
     }
 
+    this.link();
     this.sealed = true;
+
     return {
       ok: diagnostics.length === 0,
       pairs: [...this.plans.values()].map((p) => p.key),
       diagnostics,
     };
+  }
+
+  /**
+   * Links child plans by value and settles isAsync over the closure (AD-9).
+   *
+   * The fixpoint is a separate pass because a parent is async when any child
+   * is, and a cyclic group has to agree on one answer — neither is knowable
+   * while a single pair is being lowered.
+   */
+  private link(): void {
+    const byDest = this.plans;
+
+    for (const plan of byDest.values()) {
+      for (const node of plan.nodes) {
+        if (node.kind === 'nested' || node.kind === 'collection') {
+          node.childPlan = byDest.get(node.target);
+        }
+      }
+    }
+
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const plan of byDest.values()) {
+        if (plan.isAsync) continue;
+        const async = plan.nodes.some(
+          (n) =>
+            isNodeAsync(n) ||
+            ((n.kind === 'nested' || n.kind === 'collection') &&
+              (n.childPlan as MappingPlan | undefined)?.isAsync === true),
+        );
+        if (async) {
+          (plan as { isAsync: boolean }).isAsync = true;
+          changed = true;
+        }
+      }
+    }
   }
 
   isSealed(): boolean {
@@ -69,7 +125,7 @@ export class Mapper<Ctx = unknown> {
   map<D>(source: unknown, dto: ClassLike<D>, options: MapOptions<Ctx> = {}): D {
     const plan = this.planFor(dto, 'map');
     if (plan.isAsync) throw fail('REGISTRY_UNSEALED', { destType: dto, operation: 'map (async plan — use mapAsync)' });
-    return this.compiledFor(dto).invoke(source, options.ctx) as D;
+    return this.compiledFor(dto).invoke(source, options.ctx, newOpState()) as D;
   }
 
   /**
@@ -103,7 +159,7 @@ export class Mapper<Ctx = unknown> {
 
   async mapAsync<D>(source: unknown, dto: ClassLike<D>, options: MapOptions<Ctx> = {}): Promise<D> {
     this.planFor(dto, 'mapAsync');
-    return (await this.compiledFor(dto).invoke(source, options.ctx)) as D;
+    return (await this.compiledFor(dto).invoke(source, options.ctx, newOpState())) as D;
   }
 
   mapArrayAsync<D>(source: readonly unknown[], dto: ClassLike<D>, options: MapOptions<Ctx> = {}): Promise<D[]> {
@@ -177,7 +233,8 @@ export class Mapper<Ctx = unknown> {
   private compiledFor(dto: ClassLike): CompiledPlan {
     let entry = this.compiled.get(dto);
     if (!entry) {
-      entry = compile(this.plans.get(dto)!);
+      const lookup: ChildLookup = (target) => this.compiledFor(target as ClassLike);
+      entry = compile(this.plans.get(dto)!, lookup);
       this.compiled.set(dto, entry);
     }
     return entry;

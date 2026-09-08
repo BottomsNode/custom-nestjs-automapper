@@ -69,7 +69,8 @@ export interface NestedNode extends NodeBase {
   readonly kind: 'nested';
   readonly target: ClassLike;
   readonly relation: readonly PathSegment[];
-  readonly childPlanKey: string;
+  /** Linked by value during seal, so no back-end looks the child up (AD-10). */
+  childPlan?: unknown;
 }
 
 /** To-many relation. */
@@ -77,7 +78,7 @@ export interface CollectionNode extends NodeBase {
   readonly kind: 'collection';
   readonly target: ClassLike;
   readonly relation: readonly PathSegment[];
-  readonly childPlanKey: string;
+  childPlan?: unknown;
 }
 
 /**

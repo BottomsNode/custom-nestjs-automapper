@@ -19,28 +19,61 @@ const FNS = 'f';
 const CONSTS = 'k';
 const PREDS = 'p';
 const CTOR = 'D';
+const KIDS = 'n';   // child mappers, resolved lazily so cycles compile
+const OP = 'o';     // per-operation state (AD-7)
 
 export interface CompiledPlan {
   readonly key: string;
   readonly isAsync: boolean;
   /** The emitted source. Kept for diagnostics — CAP-4 can show what actually ran. */
   readonly source: string;
-  readonly invoke: (source: unknown, ctx?: unknown) => unknown;
+  readonly invoke: (source: unknown, ctx?: unknown, op?: OpState) => unknown;
 }
 
-export function compile(plan: MappingPlan): CompiledPlan {
+/**
+ * Per-operation state (AD-7). Created per top-level map, discarded on return,
+ * so nothing can go stale between requests.
+ *
+ * One identity map does the work of a visited set and a memo: the destination
+ * is inserted BEFORE its fields are filled, so a cycle finds the in-progress
+ * instance instead of recursing, and a shared reference maps once and is
+ * shared. That is why no separate ancestor chain is needed.
+ */
+export interface OpState {
+  readonly seen: Map<object, unknown>;
+  depth: number;
+}
+
+export const MAX_DEPTH = 25;
+
+export const newOpState = (): OpState => ({ seen: new Map(), depth: 0 });
+
+/** Resolves a child's compiled plan on first use, so cyclic pairs can compile. */
+export type ChildLookup = (target: unknown) => CompiledPlan | undefined;
+
+export function compile(plan: MappingPlan, lookup: ChildLookup = () => undefined): CompiledPlan {
   const fns: Array<(s: unknown) => unknown> = [];
   const consts: unknown[] = [];
   const preds: Array<(ctx: unknown) => boolean> = [];
+  const kids: Array<(s: unknown, c: unknown, o: OpState) => unknown> = [];
   const body: string[] = [];
 
   for (const node of plan.nodes) {
-    body.push(...emit(node, { fns, consts, preds, isAsync: plan.isAsync }));
+    body.push(...emit(node, { fns, consts, preds, kids, lookup, isAsync: plan.isAsync }));
   }
 
   const source = [
+    `${OP} = ${OP} || { seen: new Map(), depth: 0 };`,
+    `if (${SRC} == null) return ${SRC};`,
+    `const prior = ${OP}.seen.get(${SRC});`,
+    `if (prior !== undefined) return prior;`,
+    `if (++${OP}.depth > ${MAX_DEPTH}) { ${OP}.depth--; return undefined; }`,
     `const ${DST} = new ${CTOR}();`,
-    ...body.map((line) => line),
+    // Registered before the fields are filled, so a cycle resolves to this
+    // instance instead of recursing forever.
+    `${OP}.seen.set(${SRC}, ${DST});`,
+    ...body,
+    `${OP}.depth--;`,
     `return ${DST};`,
   ].join('\n');
 
@@ -49,19 +82,23 @@ export function compile(plan: MappingPlan): CompiledPlan {
     FNS,
     CONSTS,
     PREDS,
-    `return ${plan.isAsync ? 'async ' : ''}function (${SRC}, ${CTX}) {\n${source}\n};`,
+    KIDS,
+    `return ${plan.isAsync ? 'async ' : ''}function (${SRC}, ${CTX}, ${OP}) {
+${source}
+};`,
   ) as (
     Ctor: unknown,
     f: unknown[],
     k: unknown[],
     p: unknown[],
-  ) => (s: unknown, c?: unknown) => unknown;
+    n: unknown[],
+  ) => (s: unknown, c?: unknown, o?: OpState) => unknown;
 
   return {
     key: plan.key,
     isAsync: plan.isAsync,
     source,
-    invoke: factory(plan.dest, fns, consts, preds),
+    invoke: factory(plan.dest, fns, consts, preds, kids),
   };
 }
 
@@ -69,6 +106,8 @@ interface Slots {
   fns: Array<(s: unknown) => unknown>;
   consts: unknown[];
   preds: Array<(ctx: unknown) => boolean>;
+  kids: Array<(s: unknown, c: unknown, o: OpState) => unknown>;
+  lookup: ChildLookup;
   isAsync: boolean;
 }
 
@@ -107,15 +146,42 @@ function emit(node: ResolutionNode, slots: Slots): string[] {
       return [`if (${PREDS}[${slot}](${CTX})) {`, ...inner.map((l) => `  ${l}`), `}`];
     }
 
-    case 'nested':
-    case 'collection':
-      throw fail('DEST_NOT_RUNTIME_CLASS', { destType: node.target });
+    case 'nested': {
+      const slot = pushChild(node.target, slots);
+      return [`${target} = ${KIDS}[${slot}](${access(node.relation)}, ${CTX}, ${OP});`];
+    }
+
+    case 'collection': {
+      const slot = pushChild(node.target, slots);
+      const items = access(node.relation);
+      return [
+        `${target} = Array.isArray(${items})`,
+        `  ? ${items}.map(function (e) { return ${KIDS}[${slot}](e, ${CTX}, ${OP}); })`,
+        `  : [];`,
+      ];
+    }
 
     default: {
       const exhaustive: never = node;
       throw new Error(`unhandled node kind: ${JSON.stringify(exhaustive)}`);
     }
   }
+}
+
+/**
+ * Child mappers are resolved on first call, not at compile time: a pair that
+ * refers to itself would otherwise need its own compiled form to exist before
+ * it could be compiled.
+ */
+function pushChild(target: unknown, slots: Slots): number {
+  let resolved: CompiledPlan | undefined;
+  return (
+    slots.kids.push((s, c, o) => {
+      resolved ??= slots.lookup(target);
+      if (!resolved) throw fail('MAPPING_NOT_FOUND', { sourceType: target as never, destType: target as never });
+      return resolved.invoke(s, c, o);
+    }) - 1
+  );
 }
 
 /**
