@@ -2,7 +2,13 @@ import { AdapterRegistry } from './descriptor/registry.js';
 import type { ClassLike, FieldSelection, SchemaAdapter } from './descriptor/types.js';
 import { AutomapperError, fail } from './diagnose/automapper-error.js';
 import { isWriteDto } from './dto/pick.js';
-import { compile, newOpState, type ChildLookup, type CompiledPlan } from './emit/codegen.js';
+import {
+  compile,
+  newOpState,
+  type ChildLookup,
+  type CompiledPlan,
+  type TypeConverters,
+} from './emit/codegen.js';
 import { isNodeAsync } from './plan/node.js';
 import { buildPlan, type MappingPlan } from './plan/planner.js';
 import { writeDropReason } from './policy.js';
@@ -19,6 +25,15 @@ export interface MapOptions<Ctx> {
   readonly ctx?: Ctx;
 }
 
+export interface MapperOptions {
+  /**
+   * Applied to every field of a declared type — `{ date: v => v.toISOString() }`
+   * converts all dates at once. Possible only because each node carries its
+   * type, so it needs no per-field repetition.
+   */
+  readonly convert?: TypeConverters;
+}
+
 /**
  * Declare → seal → serve (AD-16).
  *
@@ -31,6 +46,8 @@ export class Mapper<Ctx = unknown> {
   private readonly plans = new Map<ClassLike, MappingPlan>();
   private readonly compiled = new Map<ClassLike, CompiledPlan>();
   private sealed = false;
+
+  constructor(private readonly options: MapperOptions = {}) {}
 
   use(adapter: SchemaAdapter): this {
     this.assertUnsealed('use');
@@ -234,7 +251,7 @@ export class Mapper<Ctx = unknown> {
     let entry = this.compiled.get(dto);
     if (!entry) {
       const lookup: ChildLookup = (target) => this.compiledFor(target as ClassLike);
-      entry = compile(this.plans.get(dto)!, lookup);
+      entry = compile(this.plans.get(dto)!, lookup, this.options.convert ?? {});
       this.compiled.set(dto, entry);
     }
     return entry;

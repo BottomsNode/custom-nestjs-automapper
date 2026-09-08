@@ -6,7 +6,7 @@ add that it does not have.
 **Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
 **Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
 
-Last updated: 2026-09-09 · branch `v2` · 149 tests passing · **all phases complete, all gaps closed**
+Last updated: 2026-09-09 · branch `v2` · 156 tests passing · **all phases complete, all gaps closed**
 
 ---
 
@@ -24,6 +24,7 @@ Last updated: 2026-09-09 · branch `v2` · 149 tests passing · **all phases com
 | **7** | `schemaOf` → OpenAPI | CAP-9 | ✅ done |
 | **8** | Nested/collection + identity map | CAP-6, CAP-7 | ✅ done |
 | **9** | Named mappers, `automapper check` CLI | CAP-3 | ✅ done |
+| **10** | `defaultTo`, type converters | — | ✅ done |
 
 ### Phase 0 — Workspace ✅
 

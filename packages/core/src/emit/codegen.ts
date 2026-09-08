@@ -7,6 +7,7 @@
  */
 
 import { fail } from '../diagnose/automapper-error.js';
+import type { FieldKind } from '../descriptor/types.js';
 import type { PathSegment } from '../dto/path.js';
 import type { MappingPlan } from '../plan/planner.js';
 import { children, type ResolutionNode } from '../plan/node.js';
@@ -20,6 +21,7 @@ const CONSTS = 'k';
 const PREDS = 'p';
 const CTOR = 'D';
 const KIDS = 'n';   // child mappers, resolved lazily so cycles compile
+const CONV = 'v';   // type converters, applied by declared field type
 const OP = 'o';     // per-operation state (AD-7)
 
 export interface CompiledPlan {
@@ -51,15 +53,27 @@ export const newOpState = (): OpState => ({ seen: new Map(), depth: 0 });
 /** Resolves a child's compiled plan on first use, so cyclic pairs can compile. */
 export type ChildLookup = (target: unknown) => CompiledPlan | undefined;
 
-export function compile(plan: MappingPlan, lookup: ChildLookup = () => undefined): CompiledPlan {
+/**
+ * Converters applied to every field of a declared type — `date` to an ISO
+ * string, say. Only expressible because the plan carries each field's type
+ * (AD-1); without descriptors this would have to be repeated per field.
+ */
+export type TypeConverters = Partial<Record<FieldKind, (value: unknown) => unknown>>;
+
+export function compile(
+  plan: MappingPlan,
+  lookup: ChildLookup = () => undefined,
+  converters: TypeConverters = {},
+): CompiledPlan {
   const fns: Array<(s: unknown) => unknown> = [];
   const consts: unknown[] = [];
   const preds: Array<(ctx: unknown) => boolean> = [];
   const kids: Array<(s: unknown, c: unknown, o: OpState) => unknown> = [];
+  const convs: Array<(v: unknown) => unknown> = [];
   const body: string[] = [];
 
   for (const node of plan.nodes) {
-    body.push(...emit(node, { fns, consts, preds, kids, lookup, isAsync: plan.isAsync }));
+    body.push(...emit(node, { fns, consts, preds, kids, convs, lookup, converters, isAsync: plan.isAsync }));
   }
 
   const source = [
@@ -83,6 +97,7 @@ export function compile(plan: MappingPlan, lookup: ChildLookup = () => undefined
     CONSTS,
     PREDS,
     KIDS,
+    CONV,
     `return ${plan.isAsync ? 'async ' : ''}function (${SRC}, ${CTX}, ${OP}) {
 ${source}
 };`,
@@ -92,13 +107,14 @@ ${source}
     k: unknown[],
     p: unknown[],
     n: unknown[],
+    v: unknown[],
   ) => (s: unknown, c?: unknown, o?: OpState) => unknown;
 
   return {
     key: plan.key,
     isAsync: plan.isAsync,
     source,
-    invoke: factory(plan.dest, fns, consts, preds, kids),
+    invoke: factory(plan.dest, fns, consts, preds, kids, convs),
   };
 }
 
@@ -107,7 +123,9 @@ interface Slots {
   consts: unknown[];
   preds: Array<(ctx: unknown) => boolean>;
   kids: Array<(s: unknown, c: unknown, o: OpState) => unknown>;
+  convs: Array<(v: unknown) => unknown>;
   lookup: ChildLookup;
+  converters: TypeConverters;
   isAsync: boolean;
 }
 
@@ -122,8 +140,12 @@ function emit(node: ResolutionNode, slots: Slots): string[] {
   const target = `${DST}[${key}]`;
 
   switch (node.kind) {
-    case 'copy':
-      return [`${target} = ${access(node.from)};`];
+    case 'copy': {
+      const convert = slots.converters[node.facts.type];
+      if (!convert) return [`${target} = ${access(node.from)};`];
+      const slot = slots.convs.push(convert) - 1;
+      return [`${target} = ${CONV}[${slot}](${access(node.from)});`];
+    }
 
     case 'compute':
       return [`${target} = ${FNS}[${slots.fns.push(node.fn) - 1}](${SRC});`];

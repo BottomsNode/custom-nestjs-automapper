@@ -106,6 +106,31 @@ export function visible<Src, Out, Async extends boolean>(
 }
 
 /**
+ * Substitutes a fallback when the resolved value is null or undefined.
+ *
+ * Covers both of automapper's nullSubstitution and undefinedSubstitution, and
+ * narrows the field's type to NonNullable so the DTO stops advertising a null
+ * it can no longer produce.
+ *
+ * Composes into a compute rather than adding a node kind, so no back-end has
+ * to learn about it (AD-2).
+ */
+export function defaultTo<Src, Out, A extends boolean>(
+  inner: Resolver<Src, Out, A>,
+  fallback: NonNullable<Out>,
+): Resolver<Src, NonNullable<Out>, A> {
+  return {
+    kind: inner.kind === 'resolve' ? 'resolve' : 'compute',
+    deps: inner.deps,
+    fn: (source: Src) => {
+      const value = inner.fn(source);
+      if (value instanceof Promise) return value.then((v) => v ?? fallback);
+      return value ?? fallback;
+    },
+  } as Resolver<Src, NonNullable<Out>, A>;
+}
+
+/**
  * A to-one relation, mapped by the given DTO. The source path defaults to the
  * destination field name; pass `path` when they differ.
  */
