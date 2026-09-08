@@ -1,7 +1,5 @@
-/**
- * NestJS integration — Phase 5.
- *
- * AD-16: AutomapperModule.onModuleInit calls mapper.seal(). That is the single
- * place plans are built, nested pairs are closed over, and CAP-3 becomes real.
- */
-export const PACKAGE_NAME = '@nestjs-automapper/nestjs';
+export { AutomapperModule } from './automapper.module.js';
+export type { AutomapperModuleOptions } from './automapper.module.js';
+export { InjectMapper, MapTo } from './automapper.decorators.js';
+export { MapToInterceptor } from './map-to.interceptor.js';
+export { MAPPER, MAP_TO } from './automapper.constants.js';

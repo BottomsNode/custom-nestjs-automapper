@@ -6,7 +6,7 @@ add that it does not have.
 **Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
 **Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
 
-Last updated: 2026-09-08 · branch `v2` · 80 tests passing
+Last updated: 2026-09-08 · branch `v2` · 97 tests passing
 
 ---
 
@@ -19,8 +19,8 @@ Last updated: 2026-09-08 · branch `v2` · 80 tests passing
 | **2** | `MappingPlan` IR, planner, error taxonomy | CAP-4 | ✅ done · CAP-3 partial |
 | **3** | Codegen emitter | — | ✅ done |
 | **4** | Projector + TypeORM adapter | CAP-5 | ✅ done · CAP-6 pending |
-| **5** | NestJS package, seal lifecycle, CLI | CAP-3 | ⬜ next |
-| **6** | Reverse mapping (scalars) | CAP-8 | ⬜ |
+| **5** | `Mapper` facade, NestJS module, seal lifecycle | CAP-3 | ✅ done · CLI pending |
+| **6** | Reverse mapping (scalars) | CAP-8 | ⬜ next |
 | **7** | `schemaOf` → OpenAPI | CAP-9 | ⬜ |
 | **8** | Nested/collection + identity map | CAP-6, CAP-7 | ⬜ |
 
@@ -70,11 +70,21 @@ translates it to `{ select, relations }`. Core never emits an ORM shape.
 A gated plan throws without a context rather than projecting the union of all
 contexts, which would silently over-fetch (AD-10).
 
-### Phase 5 — NestJS ⬜ next
+### Phase 5 — Mapper facade + NestJS ✅
 
-`AutomapperModule.forRoot({ adapters, validate })`, `seal()` on
-`onModuleInit` (AD-16), `@InjectMapper`, `@MapTo`, `@Projection`, and the
-`automapper check` CLI. Completes CAP-3.
+`Mapper` implements declare → seal → serve (AD-16): `map` before `seal()`
+throws, `register` after it throws, so lazy first-call planning is
+unreachable and CAP-3 cannot be silently opted out of.
+`AutomapperModule.forRoot({ adapters, dtos })` seals on `onModuleInit` and
+fails boot on a diagnostic. Ships `@InjectMapper`, `@MapTo` +
+`MapToInterceptor` (registered via `APP_INTERCEPTOR`).
+
+Deferred: the `automapper check` CLI, so CAP-3's "detectable in CI without
+starting the application" is not yet met — boot failure covers dev.
+`@Projection` is also deferred: as a param decorator it needs either a
+service locator or an injectable-pipe dance, and
+`mapper.nativeProjectionFor(Dto)` already covers it from a service.
+`forFeature` waits for a real multi-module case.
 
 ### Phase 6 — Reverse mapping ⬜
 
@@ -136,12 +146,12 @@ Surface enumerated from its published source tree on 2026-09-08.
 
 | `@automapper/core` | Ours | Status |
 |---|---|---|
-| `map` | `compile(plan).invoke` | ✅ low-level; `Mapper.map` facade Phase 5 |
-| `mapArray` | — | ⬜ Phase 5 |
-| `mapAsync` / `mapArrayAsync` | async-emitted plans | ✅ engine · facade Phase 5 |
+| `map` | `Mapper.map` | ✅ |
+| `mapArray` | `Mapper.mapArray` | ✅ |
+| `mapAsync` / `mapArrayAsync` | `Mapper.mapAsync` / `mapArrayAsync` | ✅ |
 | `mapMutate` | — | ⬜ not scheduled |
-| Profiles | `@Profile()` classes | ⬜ Phase 5 (SHOULD tier) |
-| `addProfile` | `AutomapperModule.forFeature` | ⬜ Phase 5 |
+| Profiles | `forRoot({ dtos })` | ⚠️ flat list; profile classes are SHOULD tier |
+| `addProfile` | `forFeature` | ⬜ deferred |
 | Strategies (`classes` / `pojos`) | schema adapters | ✅ replaced — pluggable per ORM |
 | Transformer plugin | **not required** | ✅ removed by design |
 
@@ -162,7 +172,7 @@ property of both sides.
 | **Typed dependency paths** (CAP-10) | A mistyped source path is a compile error; TypeScript volunteers the correction. | ✅ Phase 1 |
 | **Real codegen** (AD-3) | One emitted function per plan. No reflection in the hot path, and injection-safe. | ✅ Phase 3 |
 | **Async branding** (AD-9) | Synchronously mapping an async DTO is a compile error, not a runtime throw. | ✅ Phase 1 |
-| **Boot-time validation** (CAP-3) | An unresolved field fails `nest start`, not a request. Plus `automapper check` for CI. | ⬜ Phase 5 |
+| **Boot-time validation** (CAP-3) | An unresolved field fails `nest start`, not a request. | ✅ Phase 5 · CLI pending |
 | **Reverse mapping** (CAP-8) | Derives the write DTO, dropping database-owned fields from schema flags. Deleted from the incumbent because it had no schema to read. | ⬜ Phase 6 |
 | **OpenAPI generation** (CAP-9) | Schema from the descriptor — types, nullability, enums — with no `@ApiProperty`. | ⬜ Phase 7 |
 | **Cycle-safe graphs** (CAP-7) | Ancestor-chain detection, so shared references still map while true cycles terminate. | ⬜ Phase 8 |
@@ -189,6 +199,6 @@ Kept as a record of what earned its keep.
 ## 5. Known gaps
 
 - **`describe()` has no live-DataSource test.** `toFindOptions` is pure and tested; `describe()` needs a real driver. Mocking TypeORM's metadata classes would only test the mock.
+- **No `automapper check` CLI**, so CAP-3 is met at boot but not yet in CI.
 - **Implicit primary key in projections.** Nothing yet adds the PK when a DTO omits it. TypeORM often needs it to hydrate relations.
-- **No `Mapper` facade.** Phases 1–4 are engine pieces; `map`/`mapArray` land in Phase 5.
 - **`@nestjs-automapper` npm org not created.** Package names verified free; the org needs `npm org create` under your account.

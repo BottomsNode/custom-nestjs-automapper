@@ -1,18 +1,9 @@
 /**
- * Codegen back-end (AD-3).
+ * Codegen back-end (AD-3). One emitted function per plan.
  *
- * One specialised function per plan, built once and reused, so the hot path
- * does no metadata lookup. v1 called this "compiled" but re-read metadata on
- * every property of every call; this actually emits.
- *
- * AD-3, and the reason it is an AD rather than a style note: field names reach
- * this code from ORM metadata and user config. A column named `a"; process.exit()`
- * is a syntax error at best and arbitrary execution at worst. So:
- *   - property access is bracket notation with JSON.stringify-ed keys,
- *   - every identifier in the source comes from a fixed alphabet here,
- *   - resolver functions are passed in as closure arguments and are NEVER
- *     stringified into the body.
- * No string that originated outside this file is ever emitted as code.
+ * Field names arrive from ORM metadata, so they are untrusted input to a code
+ * generator: keys are bracketed string literals, identifiers come from a fixed
+ * alphabet below, and resolvers are closure arguments — never stringified.
  */
 
 import { fail } from '../diagnose/automapper-error.js';

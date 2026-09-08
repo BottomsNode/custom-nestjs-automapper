@@ -1,10 +1,6 @@
 /**
- * The error payload contract (AD-5).
- *
- * Open by code, closed per code: adding a code adds a payload shape, and no
- * package invents a field for an existing code. Candidate lists are never one
- * polymorphic field — `typeCandidates` and `nameCandidates` are separate, so a
- * renderer never has to guess whether it holds classes or strings.
+ * Error payloads (AD-5): open by code, closed per code. Candidate lists stay
+ * split by type so a renderer never guesses what it is holding.
  */
 
 import type { ClassLike } from '../descriptor/types.js';

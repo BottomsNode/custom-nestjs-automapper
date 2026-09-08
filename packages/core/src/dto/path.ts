@@ -1,10 +1,6 @@
 /**
- * Typed source paths (CAP-10).
- *
- * A dotted string at the API surface only. The planner lowers every path to
- * `PathSegment[]` before it enters the IR (AD-12) — no plan node ever carries
- * a dotted string, because the same string reads as relation traversal to one
- * back-end and JSON-column interior to another.
+ * Typed source paths (CAP-10). Dotted at the API surface only — the planner
+ * lowers them to `PathSegment[]` before they reach the IR (AD-12).
  */
 
 import type { ClassLike } from '../descriptor/types.js';

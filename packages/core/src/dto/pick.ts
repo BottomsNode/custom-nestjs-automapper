@@ -1,13 +1,9 @@
 /**
- * The DTO construction contract (AD-19).
+ * DTO construction (AD-19). `Pick`/`extend` return real runtime classes.
  *
- * `Pick` and `extend` return a REAL runtime class. That is what gives a DTO a
- * descriptor without decorators and without a transformer plugin — and it is
- * the fix for the v1 defect, where a DTO's fields existed only in the type
- * system, a presence check against the destination was always false, and every
- * mapping silently produced an empty object.
- *
- * Verified identical on the TypeScript 6.x and 7.x lines.
+ * The constructor assigns every declared key: without that, a presence check
+ * against the destination is always false and every mapping yields `{}` —
+ * the v1 defect.
  */
 
 import type { ClassLike, Instantiable } from '../descriptor/types.js';
