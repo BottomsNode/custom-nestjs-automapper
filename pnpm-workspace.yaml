@@ -1,0 +1,17 @@
+packages:
+  - 'packages/*'
+
+# AD-20: peer ranges are declared ONCE here and referenced with `catalog:`
+# from every package. A range may not drift per package.
+allowBuilds:
+  # nx ships a platform-native binary and needs its postinstall.
+  nx: true
+
+catalog:
+  '@nestjs/common': ^12.0.1
+  '@nestjs/core': ^12.0.1
+  '@nestjs/swagger': ^12.0.1
+  '@nestjs/testing': ^12.0.1
+  'typeorm': ^1.1.1
+  'reflect-metadata': ^0.2.2
+  'rxjs': ^7.8.0

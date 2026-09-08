@@ -1,0 +1,43 @@
+{
+  "name": "@nestjs-automapper/typeorm",
+  "version": "2.0.0-alpha.0",
+  "description": "TypeORM schema adapter for @nestjs-automapper",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs",
+    "typecheck": "node ../../scripts/tsc6.mjs -p tsconfig.json --noEmit",
+    "typecheck:ts7": "node ../../scripts/typecheck-ts7.mjs"
+  },
+  "dependencies": {
+    "@nestjs-automapper/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "typeorm": "catalog:"
+  },
+  "devDependencies": {
+    "typeorm": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
