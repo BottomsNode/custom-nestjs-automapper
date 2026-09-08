@@ -1,0 +1,1428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Mapper That Knows Your Schema</title>
+<style>
+/* ============================================================
+   @nestjs-automapper — brainstorm keepsake, 2026-09-08
+   one file. no network. dark, committed.
+   ============================================================ */
+
+:root{
+  color-scheme: dark;
+
+  --bg:        #080b10;
+  --bg-grid:   #0d1219;
+  --panel:     #0e141c;
+  --panel-2:   #121a24;
+  --line:      #1c2733;
+  --line-soft: #16202b;
+
+  --ink:       #ccd7e3;
+  --ink-hi:    #eef4fa;
+  --ink-dim:   #7a8899;
+  --ink-faint: #4c5866;
+
+  --src:   #62c9f0;   /* source side       */
+  --dst:   #b6a6f7;   /* destination side  */
+  --user:  #f2b23e;   /* the developer     */
+  --coach: #4fd6b0;   /* the coach         */
+  --dead:  #ef6f8c;   /* deleted / failing */
+  --gold:  #ffd479;   /* the won't         */
+
+  --mono: ui-monospace, "SFMono-Regular", "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --r: 3px;
+}
+
+*{ box-sizing: border-box; }
+
+html{ -webkit-text-size-adjust:100%; }
+
+body{
+  margin:0;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(to right, var(--bg-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--bg-grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.62;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap{ max-width: 1080px; margin:0 auto; padding: 0 20px; }
+
+/* ---------- type ---------- */
+h1,h2,h3,h4{ font-family: var(--mono); font-weight:600; letter-spacing:-0.01em; color: var(--ink-hi); margin:0; }
+p{ margin: 0 0 1em; }
+p:last-child{ margin-bottom:0; }
+a{ color: var(--src); }
+
+.eyebrow{
+  font-family: var(--mono); font-size: 11px; letter-spacing:.22em; text-transform:uppercase;
+  color: var(--ink-faint); margin:0 0 10px;
+}
+.lede{ font-size: 1.06rem; color: var(--ink); }
+.dim{ color: var(--ink-dim); }
+.mono{ font-family: var(--mono); }
+strong{ color: var(--ink-hi); font-weight:600; }
+em{ color: var(--ink-hi); font-style: italic; }
+
+/* ---------- hairline rules ---------- */
+.rule{ height:1px; background: var(--line); border:0; margin: 0; }
+.rule-dash{ height:1px; border:0; margin:0;
+  background-image: repeating-linear-gradient(to right, var(--line) 0 6px, transparent 6px 12px); }
+
+/* ============================================================
+   MASTHEAD
+   ============================================================ */
+header.mast{ padding: 64px 0 0; position:relative; }
+.mast-id{
+  font-family: var(--mono); font-size:11px; color: var(--ink-faint);
+  letter-spacing:.16em; text-transform:uppercase;
+  display:flex; flex-wrap:wrap; gap: 6px 18px; margin-bottom: 30px;
+}
+.mast-id b{ color: var(--ink-dim); font-weight:500; }
+
+h1.title{
+  font-size: clamp(2rem, 6.2vw, 3.9rem);
+  line-height:1.02; letter-spacing:-0.035em; margin: 0 0 6px;
+}
+h1.title .lo{ color: var(--ink-faint); }
+h1.title .hi{ color: var(--ink-hi); }
+.subtitle{
+  font-family: var(--mono); font-size: clamp(.78rem,2.3vw,.95rem); color: var(--ink-dim);
+  letter-spacing:.02em; margin: 14px 0 0; max-width: 62ch;
+}
+.subtitle .k{ color: var(--src); }
+
+.hero{ margin: 38px 0 0; }
+.hero svg{ display:block; width:100%; height:auto; }
+.hero-cap{
+  font-family: var(--mono); font-size:11px; color: var(--ink-faint);
+  letter-spacing:.06em; margin-top: 10px; text-align:right;
+}
+
+/* ---------- meta strip ---------- */
+.meta{
+  display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr));
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: rgba(14,20,28,.72); margin: 40px 0 0;
+}
+.meta div{ padding: 14px 16px; border-right: 1px solid var(--line-soft); }
+.meta div:last-child{ border-right:0; }
+.meta dt{ font-family: var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color: var(--ink-faint); }
+.meta dd{ margin: 5px 0 0; font-family: var(--mono); font-size:13px; color: var(--ink-hi); }
+.meta dd.ok{ color: var(--coach); }
+
+/* ============================================================
+   ATTRIBUTION CHIPS
+   ============================================================ */
+.by{
+  font-family: var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  padding: 2px 7px; border-radius: 2px; white-space:nowrap; vertical-align: 2px;
+  border:1px solid; display:inline-block;
+}
+.by.u{ color: var(--user);  border-color: rgba(242,178,62,.45);  background: rgba(242,178,62,.09); }
+.by.c{ color: var(--coach); border-color: rgba(79,214,176,.32);  background: rgba(79,214,176,.07); }
+
+/* spotlight mode: dim everything the user didn't say */
+body.spot .card:not(.is-user){ opacity:.26; filter: saturate(.25); }
+body.spot .card.is-user{ box-shadow: 0 0 0 1px rgba(242,178,62,.5), 0 0 34px -14px rgba(242,178,62,.6); }
+.card{ transition: opacity .25s ease, filter .25s ease, box-shadow .25s ease; }
+
+.toggle{
+  position: sticky; top:0; z-index: 40;
+  background: linear-gradient(to bottom, var(--bg) 62%, transparent);
+  padding: 12px 0 18px; margin-top: 44px;
+}
+.toggle button{
+  font-family: var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color: var(--ink-dim); background: var(--panel); border:1px solid var(--line);
+  border-radius: var(--r); padding: 8px 14px; cursor:pointer;
+}
+.toggle button:hover{ color: var(--ink-hi); border-color: var(--ink-faint); }
+.toggle button[aria-pressed="true"]{ color: var(--user); border-color: rgba(242,178,62,.55); background: rgba(242,178,62,.08); }
+.toggle .hint{ font-family: var(--mono); font-size:11px; color: var(--ink-faint); margin-left: 12px; }
+
+/* ============================================================
+   ACTS
+   ============================================================ */
+section.act{ padding: 66px 0 20px; scroll-margin-top: 20px; }
+
+.act-head{ display:flex; align-items:flex-start; gap: 20px; flex-wrap:wrap; margin-bottom: 8px; }
+.act-num{
+  font-family: var(--mono); font-size: clamp(2.4rem,9vw,4.6rem); line-height:.82;
+  color: transparent; -webkit-text-stroke: 1px var(--line);
+  letter-spacing:-.04em; user-select:none;
+}
+.act-titles{ flex:1 1 260px; min-width: 0; }
+.act-kicker{ font-family: var(--mono); font-size:11px; letter-spacing:.24em; text-transform:uppercase; color: var(--ink-faint); }
+.act-titles h2{ font-size: clamp(1.35rem,4.2vw,2.05rem); letter-spacing:-.025em; margin: 6px 0 0; }
+.act-blurb{ margin: 14px 0 0; color: var(--ink-dim); max-width: 68ch; font-size:.97rem; }
+
+/* per-act accent, set on the section */
+.act[data-hue="triz"]  { --hue: var(--src);  }
+.act[data-hue="fail"]  { --hue: var(--dead); }
+.act[data-hue="flip"]  { --hue: var(--dst);  }
+.act[data-hue="scope"] { --hue: var(--coach);}
+.act[data-hue="synth"] { --hue: var(--gold); }
+.act .act-titles h2{ color: var(--hue, var(--ink-hi)); }
+.act .act-num{ -webkit-text-stroke-color: color-mix(in srgb, var(--hue) 34%, transparent); }
+
+/* ---------- generic card ---------- */
+.card{
+  border:1px solid var(--line); border-radius: var(--r);
+  background: rgba(14,20,28,.78); padding: 18px 20px; margin: 14px 0;
+}
+.card h4{ font-size:.86rem; letter-spacing:.02em; margin-bottom:8px; }
+.card p{ font-size:.95rem; }
+.card .tag{
+  font-family: var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+  color: var(--ink-faint); display:block; margin-bottom:7px;
+}
+.cards2{ display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 14px; }
+.cards2 .card{ margin:0; }
+
+/* ============================================================
+   ACT I — TRIZ : the contradiction rig
+   ============================================================ */
+.triz{ border:1px solid var(--line); border-radius: var(--r); background: rgba(14,20,28,.78); margin: 22px 0; overflow:hidden; }
+.triz-top{
+  display:grid; grid-template-columns: 1fr auto 1fr; align-items:stretch;
+  border-bottom: 1px solid var(--line);
+}
+.triz-side{ padding: 18px 20px; min-width:0; }
+.triz-side .lab{ font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color: var(--ink-faint); }
+.triz-side p{ margin: 8px 0 0; font-family: var(--mono); font-size:.88rem; color: var(--ink-hi); line-height:1.5; }
+.triz-side.a{ border-right:1px solid var(--line-soft); }
+.triz-vs{
+  display:flex; align-items:center; justify-content:center; padding: 0 14px;
+  font-family: var(--mono); font-size:11px; letter-spacing:.2em; color: var(--dead);
+  background: repeating-linear-gradient(45deg, transparent 0 5px, rgba(239,111,140,.05) 5px 10px);
+  border-left:1px solid var(--line-soft); border-right:1px solid var(--line-soft);
+}
+.triz-res{ padding: 18px 20px; background: rgba(98,201,240,.045); }
+.triz-res .lab{ font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color: var(--src); }
+.triz-res p{ margin:8px 0 0; font-size:.95rem; }
+@media (max-width: 640px){
+  .triz-top{ grid-template-columns: 1fr; }
+  .triz-side.a{ border-right:0; border-bottom:1px solid var(--line-soft); }
+  .triz-vs{ border:0; border-bottom:1px solid var(--line-soft); padding: 8px; }
+}
+
+/* lifetime figure */
+.fig{ border:1px solid var(--line); border-radius: var(--r); background: rgba(11,16,22,.85); padding: 20px; margin: 22px 0; }
+.fig > figcaption{
+  font-family: var(--mono); font-size:11px; color: var(--ink-faint); letter-spacing:.05em;
+  margin-top: 14px; padding-top: 12px; border-top:1px dashed var(--line);
+}
+.fig svg{ display:block; width:100%; height:auto; }
+.fig-title{ font-family:var(--mono); font-size:11px; letter-spacing:.2em; text-transform:uppercase; color: var(--ink-dim); margin-bottom:16px; }
+
+/* ---------- tables ---------- */
+.scroll-x{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+table{ border-collapse: collapse; width:100%; min-width: 620px; font-size:.87rem; }
+th,td{ text-align:left; padding: 11px 14px; border-bottom:1px solid var(--line-soft); vertical-align: top; }
+thead th{
+  font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  color: var(--ink-faint); border-bottom:1px solid var(--line); white-space:nowrap;
+}
+tbody td:first-child{ font-family: var(--mono); color: var(--ink-hi); white-space:nowrap; }
+td.read{ color: var(--src); font-family: var(--mono); font-size:.82rem; }
+td.write{ color: var(--dst); font-family: var(--mono); font-size:.82rem; }
+td.own{ color: var(--ink-dim); font-size:.82rem; }
+tr.drop td.write{ color: var(--dead); }
+
+/* ============================================================
+   ACT II — FAILURE ANALYSIS : the autopsy
+   ============================================================ */
+.autopsy{
+  border:1px solid rgba(239,111,140,.28); border-radius: var(--r);
+  background:
+    repeating-linear-gradient(to bottom, rgba(239,111,140,.028) 0 1px, transparent 1px 3px),
+    rgba(16,11,14,.7);
+  margin: 22px 0;
+}
+.autopsy-head{
+  display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap;
+  padding: 14px 20px; border-bottom:1px solid rgba(239,111,140,.24);
+  font-family: var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color: var(--dead);
+}
+.autopsy-body{ padding: 18px 20px; }
+.specimen{
+  font-family: var(--mono); font-size:.95rem; color: var(--ink-hi);
+}
+.specimen s{ color: var(--dead); text-decoration-thickness:1px; text-decoration-color: rgba(239,111,140,.8); }
+.finding{ display:grid; grid-template-columns: 108px 1fr; gap: 4px 16px; margin-top: 16px; font-size:.93rem; }
+.finding dt{ font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color: var(--ink-faint); padding-top:5px; }
+.finding dd{ margin:0; }
+@media (max-width:560px){ .finding{ grid-template-columns: 1fr; } .finding dt{ padding-top:10px; } }
+
+/* symptom list */
+.symptoms{ list-style:none; padding:0; margin: 0; counter-reset: sx; }
+.symptoms li{
+  counter-increment: sx; position:relative; padding: 12px 0 12px 46px;
+  border-bottom:1px dashed var(--line); font-size:.95rem;
+}
+.symptoms li:last-child{ border-bottom:0; }
+.symptoms li::before{
+  content: "S" counter(sx); position:absolute; left:0; top:12px;
+  font-family: var(--mono); font-size:11px; color: var(--dead);
+  border:1px solid rgba(239,111,140,.35); border-radius:2px; padding: 1px 6px;
+}
+.symptoms li b{ color: var(--ink-hi); }
+
+/* error box (the "errors are a feature" exhibit) */
+.errbox{
+  font-family: var(--mono); font-size: .8rem; line-height:1.75; white-space:pre;
+  border:1px solid var(--line); border-left: 2px solid var(--coach);
+  background: #070a0e; border-radius: var(--r); padding: 16px 18px; margin: 16px 0 0;
+}
+.errbox .e{ color: var(--dead); }
+.errbox .lbl{ color: var(--ink-faint); }
+.errbox .ok{ color: var(--coach); }
+.errbox .pt{ color: var(--src); }
+
+/* ============================================================
+   ACT III — ASSUMPTION REVERSAL : the flip
+   ============================================================ */
+.flip{ display:grid; grid-template-columns: 1fr; border:1px solid var(--line); border-radius: var(--r); overflow:hidden; margin: 16px 0; background: rgba(14,20,28,.78); }
+.flip-was{ padding: 16px 20px; border-bottom:1px solid var(--line); background: rgba(0,0,0,.25); }
+.flip-now{ padding: 16px 20px; background: rgba(182,166,247,.05); }
+.flip .lab{ font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; }
+.flip-was .lab{ color: var(--ink-faint); }
+.flip-now .lab{ color: var(--dst); }
+.flip p{ margin: 8px 0 0; font-size:.95rem; }
+.flip-was p{ color: var(--ink-dim); }
+.flip-was p .struck{ text-decoration: line-through; text-decoration-color: rgba(239,111,140,.7); color: var(--ink-faint); }
+.flip-arrow{
+  font-family: var(--mono); font-size:11px; letter-spacing:.2em; color: var(--dst);
+  padding: 0 20px 0; margin-top:-1px;
+}
+
+/* ---------- code ---------- */
+.codewrap{ border:1px solid var(--line); border-radius: var(--r); background: #070a0e; overflow:hidden; }
+.codewrap .fname{
+  font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  color: var(--ink-faint); padding: 9px 14px; border-bottom:1px solid var(--line);
+  background: rgba(255,255,255,.015); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+}
+.codewrap .fname .cnt{ color: var(--ink-faint); }
+.codewrap .fname .bad{ color: var(--dead); }
+.codewrap .fname .good{ color: var(--coach); }
+pre{
+  margin:0; padding: 16px 18px; overflow-x:auto; -webkit-overflow-scrolling:touch;
+  font-family: var(--mono); font-size:.78rem; line-height:1.72; color: #b9c6d4; tab-size:2;
+}
+code{ font-family: var(--mono); }
+p code, li code, td code, dd code{
+  font-size:.86em; color: var(--ink-hi); background: rgba(255,255,255,.045);
+  border:1px solid var(--line-soft); border-radius:2px; padding: 0 4px;
+}
+/* hand-rolled token colors */
+.k  { color:#e28ac6; }   /* keyword     */
+.t  { color:#69d2f5; }   /* type        */
+.f  { color:#a9b6ff; }   /* function    */
+.s  { color:#8fd98a; }   /* string      */
+.n  { color:#f0b46b; }   /* number/lit  */
+.c  { color:#4a5666; font-style: italic; } /* comment */
+.d  { color:#f2b23e; }   /* decorator   */
+.p  { color:#5d6a79; }   /* punctuation */
+.x  { color:#ef6f8c; }   /* the bad bit */
+.g  { color:#4fd6b0; }   /* the good bit*/
+
+.side-by-side{ display:grid; grid-template-columns: 1fr; gap: 14px; margin: 20px 0; }
+@media (min-width: 900px){ .side-by-side{ grid-template-columns: 1fr 1fr; } }
+
+/* ============================================================
+   ACT IV — MoSCoW : the build ladder
+   ============================================================ */
+.ladder{ margin: 26px 0 0; }
+.rung{
+  display:grid; grid-template-columns: 132px 1fr; gap: 0;
+  border:1px solid var(--line); border-top:0; background: rgba(14,20,28,.78);
+}
+.rung:first-of-type{ border-top:1px solid var(--line); border-radius: var(--r) var(--r) 0 0; }
+.rung:last-of-type{ border-radius: 0 0 var(--r) var(--r); }
+.rung-key{
+  padding: 18px 16px; border-right:1px solid var(--line);
+  background: rgba(0,0,0,.28);
+}
+.rung-key .tier{ font-family:var(--mono); font-size:.95rem; letter-spacing:.12em; font-weight:600; }
+.rung-key .when{ font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color: var(--ink-faint); margin-top:5px; }
+.rung-key .n{ font-family:var(--mono); font-size:10px; color: var(--ink-faint); margin-top: 10px; }
+.rung-items{ padding: 10px 4px 10px 0; }
+.rung ol{ margin:0; padding:0; list-style:none; }
+.rung ol li{
+  display:grid; grid-template-columns: 34px 1fr; gap: 10px;
+  padding: 7px 16px; font-size:.92rem; align-items:baseline;
+}
+.rung ol li .idx{ font-family:var(--mono); font-size:11px; color: var(--ink-faint); text-align:right; }
+.rung ol li .what{ min-width:0; }
+.rung ol li .what b{ font-family: var(--mono); font-weight:600; font-size:.86rem; }
+.rung ol li .what span{ display:block; color: var(--ink-dim); font-size:.85rem; line-height:1.5; }
+
+.rung.must   .rung-key{ border-left:2px solid var(--coach); } .rung.must   .tier{ color: var(--coach); } .rung.must   li .what b{ color:#d6f5ea; }
+.rung.should .rung-key{ border-left:2px solid var(--src); }   .rung.should .tier{ color: var(--src); }   .rung.should li .what b{ color:#cfeafa; }
+.rung.could  .rung-key{ border-left:2px solid var(--dst); }   .rung.could  .tier{ color: var(--dst); }   .rung.could  li .what b{ color:#ded6ff; }
+@media (max-width: 620px){
+  .rung{ grid-template-columns: 1fr; }
+  .rung-key{ border-right:0; border-bottom:1px solid var(--line); display:flex; gap:14px; align-items:baseline; flex-wrap:wrap; }
+  .rung-key .when,.rung-key .n{ margin-top:0; }
+}
+
+/* ---------- the WON'T ---------- */
+.wont{
+  margin: 40px 0 0; border:1px solid rgba(255,212,121,.34); border-radius: var(--r);
+  background:
+    radial-gradient(120% 140% at 90% -20%, rgba(255,212,121,.10), transparent 60%),
+    rgba(18,15,10,.8);
+  position:relative; overflow:hidden;
+}
+.wont::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background: repeating-linear-gradient(-45deg, transparent 0 22px, rgba(255,212,121,.028) 22px 44px);
+}
+.wont-inner{ position:relative; padding: 26px 24px; }
+.wont .stamp{
+  font-family: var(--mono); font-size:10px; letter-spacing:.28em; text-transform:uppercase;
+  color: var(--gold); border:1px solid rgba(255,212,121,.4); border-radius:2px;
+  padding: 4px 10px; display:inline-block;
+}
+.wont h3{ font-size: clamp(1.1rem,3.4vw,1.55rem); color: var(--gold); margin: 16px 0 0; letter-spacing:-.02em; }
+.wont .verdict{ margin-top: 14px; max-width: 74ch; }
+.wont-grid{ display:grid; grid-template-columns: 1fr; gap: 0; margin-top: 22px; border-top:1px solid rgba(255,212,121,.2); }
+@media (min-width: 780px){ .wont-grid{ grid-template-columns: 1fr 1fr 1fr; } }
+.wont-grid div{ padding: 16px 18px 0; border-right:0; }
+@media (min-width:780px){ .wont-grid div{ border-right:1px solid rgba(255,212,121,.16); } .wont-grid div:last-child{ border-right:0; padding-right:0; } .wont-grid div:first-child{ padding-left:0; } }
+.wont-grid .h{ font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase; color: var(--gold); }
+.wont-grid p{ margin-top:7px; font-size:.9rem; color: var(--ink-dim); }
+
+/* ============================================================
+   SYNTHESIS
+   ============================================================ */
+.synth{
+  border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  background:
+    radial-gradient(90% 120% at 50% 0%, rgba(255,212,121,.055), transparent 65%),
+    rgba(9,12,17,.6);
+  margin-top: 70px; padding: 66px 0 60px;
+}
+.claim{
+  font-family: var(--mono); font-size: clamp(1.25rem, 4.6vw, 2.5rem); line-height:1.2;
+  letter-spacing:-.03em; color: var(--ink-hi); margin: 26px 0 0; max-width: 22ch;
+}
+.claim .gold{ color: var(--gold); }
+.claim .strike{ color: var(--ink-faint); text-decoration: line-through; text-decoration-color: rgba(239,111,140,.55); }
+
+.pattern{
+  border:1px solid var(--line); border-left:2px solid var(--user); border-radius: var(--r);
+  background: rgba(242,178,62,.05); padding: 22px 24px; margin: 26px 0 0;
+}
+.pattern .q{
+  font-family: var(--mono); font-size: clamp(1rem,3vw,1.35rem); color: var(--user);
+  letter-spacing:-.02em; margin: 12px 0; line-height:1.35;
+}
+
+/* ledger */
+.ledger{ display:grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap:0; border:1px solid var(--line); border-radius:var(--r); margin: 22px 0 0; }
+.ledger div{ padding: 18px; border-right:1px solid var(--line-soft); }
+.ledger div:last-child{ border-right:0; }
+.ledger .big{ font-family:var(--mono); font-size: 2rem; line-height:1; letter-spacing:-.04em; color: var(--ink-hi); }
+.ledger .big.u{ color: var(--user); }
+.ledger .big.c{ color: var(--coach); }
+.ledger .lbl{ font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color: var(--ink-faint); margin-top: 9px; }
+
+.sharpest{ display:grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin-top: 18px; }
+.sharp{
+  border:1px solid rgba(242,178,62,.3); border-radius: var(--r);
+  background: rgba(242,178,62,.045); padding: 16px 18px;
+}
+.sharp .n{ font-family:var(--mono); font-size:10px; letter-spacing:.2em; color: var(--user); }
+.sharp h4{ margin-top:8px; font-size:.9rem; color: var(--ink-hi); }
+.sharp p{ margin-top:8px; font-size:.87rem; color: var(--ink-dim); }
+
+/* ---------- footer ---------- */
+footer{ padding: 46px 0 70px; }
+.foot-line{
+  font-family: var(--mono); font-size:11px; color: var(--ink-faint); letter-spacing:.06em;
+  display:flex; justify-content:space-between; gap: 12px; flex-wrap:wrap;
+}
+
+/* prevent any stray overflow */
+svg, img, pre, table{ max-width:100%; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     MASTHEAD
+     ============================================================ -->
+<header class="mast">
+  <div class="wrap">
+    <div class="mast-id">
+      <span><b>session</b> brainstorm-automapper-differentiation</span>
+      <span><b>date</b> 2026-09-08</span>
+      <span><b>mode</b> creative partner</span>
+      <span><b>log</b> 39 moves, 4 lenses</span>
+    </div>
+
+    <h1 class="title"><span class="lo">the mapper that</span><br><span class="hi">knows your schema</span></h1>
+
+    <p class="subtitle">
+      One evening spent taking <span class="k">@automapper/core</span> apart to find out what
+      <span class="k">@nestjs-automapper</span> should be. Parity at a fraction of the user code,
+      plus the features it structurally cannot ship.
+    </p>
+
+    <!-- HERO: source -> destination, with the write path refusing three fields -->
+    <div class="hero">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Mapping arrows from a User entity to a ReadUserDto, with id, createdAt and updatedAt refused on the reverse path">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#62c9f0"/>
+          </marker>
+          <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#b6a6f7"/>
+          </marker>
+        </defs>
+
+        <!-- source panel -->
+        <rect x="8" y="26" width="250" height="248" fill="#0e141c" stroke="#1c2733"/>
+        <text x="22" y="18" font-family="ui-monospace,monospace" font-size="10" fill="#4c5866" letter-spacing="2">SOURCE · ENTITY</text>
+        <text x="22" y="52" font-family="ui-monospace,monospace" font-size="13" fill="#62c9f0">class User</text>
+        <line x1="8" y1="64" x2="258" y2="64" stroke="#16202b"/>
+
+        <g font-family="ui-monospace,monospace" font-size="12" fill="#ccd7e3">
+          <text x="22" y="92">id<tspan fill="#4c5866">: uuid</tspan></text>
+          <text x="22" y="120">firstName<tspan fill="#4c5866">: string</tspan></text>
+          <text x="22" y="148">lastName<tspan fill="#4c5866">: string</tspan></text>
+          <text x="22" y="176">email<tspan fill="#4c5866">: string</tspan></text>
+          <text x="22" y="204">address<tspan fill="#4c5866">: Address</tspan></text>
+          <text x="22" y="232">createdAt<tspan fill="#4c5866">: Date</tspan></text>
+          <text x="22" y="260">updatedAt<tspan fill="#4c5866">: Date</tspan></text>
+        </g>
+        <g font-family="ui-monospace,monospace" font-size="9" fill="#ef6f8c">
+          <text x="196" y="92">DB</text>
+          <text x="196" y="232">DB</text>
+          <text x="196" y="260">DB</text>
+        </g>
+
+        <!-- destination panel -->
+        <rect x="642" y="26" width="250" height="248" fill="#0e141c" stroke="#1c2733"/>
+        <text x="656" y="18" font-family="ui-monospace,monospace" font-size="10" fill="#4c5866" letter-spacing="2">DESTINATION · DTO</text>
+        <text x="656" y="52" font-family="ui-monospace,monospace" font-size="13" fill="#b6a6f7">ReadUserDto</text>
+        <line x1="642" y1="64" x2="892" y2="64" stroke="#16202b"/>
+        <g font-family="ui-monospace,monospace" font-size="12" fill="#ccd7e3">
+          <text x="656" y="92">id</text>
+          <text x="656" y="120">fullName <tspan fill="#f2b23e" font-size="9">computed</tspan></text>
+          <text x="656" y="148">email <tspan fill="#f2b23e" font-size="9">visible()</tspan></text>
+          <text x="656" y="176">address <tspan fill="#4c5866" font-size="9">AddressDto</tspan></text>
+          <text x="656" y="204">createdAt</text>
+        </g>
+
+        <!-- forward arrows: read path -->
+        <g fill="none" stroke="#62c9f0" stroke-width="1.1" marker-end="url(#ah)" opacity=".85">
+          <path d="M262 88 C 420 88, 480 88, 636 88"/>
+          <path d="M262 116 C 420 116, 470 116, 636 116"/>
+          <path d="M262 144 C 420 144, 470 116, 636 116" opacity=".55"/>
+          <path d="M262 172 C 420 172, 480 144, 636 144"/>
+          <path d="M262 200 C 420 200, 480 172, 636 172"/>
+          <path d="M262 228 C 420 228, 480 200, 636 200"/>
+        </g>
+
+        <!-- reverse path: only scalars, three refused -->
+        <g fill="none" stroke="#b6a6f7" stroke-width="1.1" stroke-dasharray="4 4" marker-end="url(#ah2)" opacity=".7">
+          <path d="M636 262 C 470 262, 420 262, 268 262" transform="translate(0,12)"/>
+        </g>
+
+        <text x="452" y="20" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#62c9f0" letter-spacing="2">READ PATH →</text>
+        <text x="452" y="292" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#b6a6f7" letter-spacing="2">← WRITE PATH · SCALARS ONLY · id / createdAt / updatedAt REFUSED</text>
+
+        <!-- the knowing bit -->
+        <rect x="330" y="112" width="240" height="46" fill="#080b10" stroke="#1c2733"/>
+        <text x="450" y="132" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#eef4fa">SCHEMA DESCRIPTOR</text>
+        <text x="450" y="148" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#4c5866">isGenerated · isPrimary · nullability · enums</text>
+      </svg>
+      <div class="hero-cap">fig. 0 — everything below follows from the box in the middle</div>
+    </div>
+
+    <dl class="meta">
+      <div><dt>topic</dt><dd>beating @automapper/core</dd></div>
+      <div><dt>goal</dt><dd>parity, less code, more</dd></div>
+      <div><dt>lenses run</dt><dd>4</dd></div>
+      <div><dt>ideas cut</dt><dd>2</dd></div>
+      <div><dt>status</dt><dd class="ok">complete</dd></div>
+    </dl>
+
+    <div class="toggle">
+      <button id="spot" aria-pressed="false">spotlight: the developer</button>
+      <span class="hint">11 of 39 moves were his</span>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================
+     PROLOGUE — RECON
+     ============================================================ -->
+<section class="act" id="recon" data-hue="triz">
+  <div class="wrap">
+    <div class="act-head">
+      <div class="act-num">00</div>
+      <div class="act-titles">
+        <div class="act-kicker">prologue</div>
+        <h2>Recon on the incumbent</h2>
+      </div>
+    </div>
+    <p class="act-blurb">
+      Before any technique, the surface area of the thing being beaten. One finding here quietly set the
+      agenda for the whole session.
+    </p>
+
+    <div class="card is-coach">
+      <span class="tag">verified <span class="by c">by coach</span></span>
+      <h4>@automapper/core has no reverseMap.</h4>
+      <p>
+        Legacy <code>@nartc/automapper</code> <em>had</em> <code>reverseMap()</code>. The rewrite dropped it.
+        A feature that ships, then gets deleted in a rewrite, was not forgotten — it was
+        <strong>hard to do correctly</strong>. Act II works out why, and Act I works out why we can.
+      </p>
+    </div>
+
+    <div class="card is-coach">
+      <span class="tag">surface map <span class="by c">by coach</span></span>
+      <div class="scroll-x">
+        <pre><code><span class="c">// config-level</span>
+afterMap  afterMapArray  autoMap  beforeMap  beforeMapArray  constructUsing
+extend    forMember      forSelf  namingConventions  typeConverters
+
+<span class="c">// member-level</span>
+condition  convertUsing  fromValue  ignore   mapDefer  mapFrom  mapInitialize
+mapWithArguments  mapWith  nullSubstitution  preCondition  undefinedSubstitution
+
+<span class="c">// and compile-mapping.ts exists — so it does precompile. Speed is not the gap.</span></code></pre>
+      </div>
+      <p style="margin-top:14px" class="dim">
+        Twenty-three configuration verbs. The gap was never expressiveness — it was how much the user
+        has to say before any of it works.
+      </p>
+    </div>
+
+    <div class="cards2">
+      <div class="card is-user">
+        <span class="tag">direction <span class="by u">by user</span></span>
+        <p>Parity with automapper at <strong>lower code cost</strong>, plus features it lacks — and an explicit invitation: <em>cut my weak ideas.</em></p>
+      </div>
+      <div class="card is-user">
+        <span class="tag">deck <span class="by u">by user</span></span>
+        <p class="mono" style="font-size:.85rem">
+          TRIZ Contradiction · Failure Analysis · Assumption Reversal · <span class="dim">Kill the Crown Jewel</span>
+        </p>
+        <p class="dim" style="font-size:.85rem;margin-top:8px">
+          The fourth card was never played by name. The crown jewel got killed in convergence instead — see the WON'T.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule-dash">
+
+<!-- ============================================================
+     ACT I — TRIZ
+     ============================================================ -->
+<section class="act" id="triz" data-hue="triz">
+  <div class="wrap">
+    <div class="act-head">
+      <div class="act-num">01</div>
+      <div class="act-titles">
+        <div class="act-kicker">lens one · TRIZ contradiction</div>
+        <h2>Refusing the trade-off</h2>
+      </div>
+    </div>
+    <p class="act-blurb">
+      TRIZ says: when you are asked to choose between two goods, the choice itself is the defect. Three
+      contradictions came up. None were split down the middle; each was dissolved by separating the two
+      goods <em>in time</em>, <em>in direction</em>, or <em>in ownership</em>.
+    </p>
+
+    <!-- C1 -->
+    <div class="triz">
+      <div class="triz-top">
+        <div class="triz-side a">
+          <div class="lab">want</div>
+          <p>Projection push-down needs<br>dependency annotations.</p>
+        </div>
+        <div class="triz-vs">VS</div>
+        <div class="triz-side">
+          <div class="lab">want</div>
+          <p>Nobody should annotate deps<br>just to define a DTO.</p>
+        </div>
+      </div>
+      <div class="triz-res">
+        <div class="lab">resolved — separation in time <span class="by c">by coach</span></div>
+        <p>
+          Deps are <strong>optional at <code>createMap</code>, required only when <code>projectionFor</code> is called.</strong>
+          The error names exactly which resolvers need annotating. Projection stops being an entry fee and
+          becomes an opt-in upgrade.
+        </p>
+      </div>
+    </div>
+
+    <!-- C2 : the user's own -->
+    <div class="triz">
+      <div class="triz-top">
+        <div class="triz-side a">
+          <div class="lab">want <span class="by u">by user</span></div>
+          <p>Cache the mapping result.<br>Speed.</p>
+        </div>
+        <div class="triz-vs">VS</div>
+        <div class="triz-side">
+          <div class="lab">want</div>
+          <p>Correctness. The cache goes<br>stale when the entity changes.</p>
+        </div>
+      </div>
+      <div class="triz-res">
+        <div class="lab">resolved — shrink the lifetime <span class="by c">by coach</span></div>
+        <p>
+          Staleness is not a function of caching. It is a function of cache <strong>LIFETIME</strong>.
+          Shrink the lifetime to a single map operation and staleness becomes <em>structurally impossible</em> —
+          no time passes in which the entity could change.
+        </p>
+      </div>
+    </div>
+
+    <figure class="fig">
+      <div class="fig-title">fig. 1 — where staleness lives</div>
+      <svg viewBox="0 0 880 210" role="img" aria-label="Two timelines: a mapper-lifetime cache with a long staleness window, versus a per-operation identity map with none">
+        <!-- axis 1 -->
+        <text x="0" y="22" font-family="ui-monospace,monospace" font-size="11" fill="#ef6f8c">CUT · mapper-lifetime result cache</text>
+        <line x1="0" y1="46" x2="880" y2="46" stroke="#1c2733"/>
+        <rect x="90" y="34" width="700" height="24" fill="rgba(239,111,140,.12)" stroke="rgba(239,111,140,.45)"/>
+        <text x="440" y="51" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#ef6f8c">STALENESS WINDOW — the entity can change in here</text>
+        <g font-family="ui-monospace,monospace" font-size="9" fill="#4c5866">
+          <text x="88" y="76">first map()</text>
+          <text x="700" y="76">process exit</text>
+        </g>
+
+        <!-- axis 2 -->
+        <text x="0" y="126" font-family="ui-monospace,monospace" font-size="11" fill="#4fd6b0">KEEP · per-operation identity map</text>
+        <line x1="0" y1="150" x2="880" y2="150" stroke="#1c2733"/>
+        <rect x="90" y="138" width="34" height="24" fill="rgba(79,214,176,.16)" stroke="rgba(79,214,176,.5)"/>
+        <text x="140" y="155" font-family="ui-monospace,monospace" font-size="10" fill="#4fd6b0">one map operation — window ≈ 0</text>
+        <g font-family="ui-monospace,monospace" font-size="9" fill="#4c5866">
+          <text x="88" y="180">map()</text>
+          <text x="118" y="196">↑ born and dead inside the call</text>
+        </g>
+      </svg>
+      <figcaption>
+        The same object then paid for itself three more times: <span class="mono">resolver batching</span>,
+        <span class="mono">nested dedupe</span>, <span class="mono">cycle detection</span>.
+      </figcaption>
+    </figure>
+
+    <div class="cards2">
+      <div class="card is-user">
+        <span class="tag">the same shape again <span class="by u">by user</span></span>
+        <h4>Validation rules have the lifetime problem too.</h4>
+        <p>They live on the mapper <em>forever</em>. Same defect, different subsystem — spotted by the developer, unprompted.</p>
+      </div>
+      <div class="card is-coach">
+        <span class="tag">decision — CUT <span class="by c">by coach</span></span>
+        <h4>The mapper-lifetime result cache is dead weight.</h4>
+        <p>Deleted. Replaced by the per-operation identity map, which delivers batching and cycle detection out of the same object.</p>
+      </div>
+    </div>
+
+    <!-- C3: direction asymmetry -->
+    <div class="triz">
+      <div class="triz-top">
+        <div class="triz-side a">
+          <div class="lab">want</div>
+          <p>Validate mapped values.</p>
+        </div>
+        <div class="triz-vs">VS</div>
+        <div class="triz-side">
+          <div class="lab">want</div>
+          <p>Don't re-validate everything<br>read out of your own DB.</p>
+        </div>
+      </div>
+      <div class="triz-res">
+        <div class="lab">resolved — separation in direction <span class="by c">by coach</span></div>
+        <p>
+          Validation is <strong>direction-asymmetric</strong>. It belongs on the <em>write</em> path
+          (<code>CreateDto → Entity</code>) only. Entities read from your own database do not need value validation.
+          And don't compete with <code>class-validator</code> — <strong>consume it as a SchemaAdapter</strong>:
+          its decorators already <em>are</em> schema metadata for the DTO side (nullability, types, enum values).
+        </p>
+      </div>
+    </div>
+
+    <div class="card is-coach">
+      <span class="tag">open question <span class="by c">by coach</span></span>
+      <h4>A gap in DESIGN.md.</h4>
+      <p>
+        Adapters describe <strong>entities</strong> (TypeORM, Prisma). What produces the descriptor for the
+        <strong>DTO</strong> side? Strict mode needs one. Candidates on the table:
+        a class-validator adapter, a decorator adapter, or TS-type codegen.
+        <span class="dim">Act II answers it with something none of the three.</span>
+      </p>
+    </div>
+
+    <!-- read/write asymmetry table -->
+    <div class="card is-user" style="padding-bottom:6px">
+      <span class="tag">the observation that unlocked reverse mapping <span class="by u">by user</span></span>
+      <h4>The read path and the write path are not mirrors.</h4>
+      <p style="margin-bottom:16px">
+        <code>id</code> is DB-generated. So are the timestamps. The write DTO should not send them.
+      </p>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr><th>field</th><th>read · Entity → ReadDto</th><th>write · CreateDto → Entity</th><th>owner</th></tr>
+          </thead>
+          <tbody>
+            <tr class="drop"><td>id</td><td class="read">emit</td><td class="write">✕ refuse — DB generates it</td><td class="own">database · isGenerated</td></tr>
+            <tr class="drop"><td>createdAt</td><td class="read">emit</td><td class="write">✕ refuse</td><td class="own">database · isCreateDate</td></tr>
+            <tr class="drop"><td>updatedAt</td><td class="read">emit</td><td class="write">✕ refuse</td><td class="own">database · isUpdateDate</td></tr>
+            <tr><td>firstName</td><td class="read">mirror</td><td class="write">mirror — reversible</td><td class="own">user-supplied</td></tr>
+            <tr><td>email</td><td class="read">mirror, context-gated</td><td class="write">mirror + validate</td><td class="own">user-supplied</td></tr>
+            <tr><td>address</td><td class="read">expand → AddressDto</td><td class="write">collapse → addressId</td><td class="own">relation · not a mirror</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card is-coach" style="border-left:2px solid var(--src)">
+      <span class="tag">unlock <span class="by c">by coach</span></span>
+      <h4>Reverse mapping is only correctly implementable <em>because of</em> schema adapters.</h4>
+      <p>
+        TypeORM already exposes <code>isGenerated</code> / <code>isPrimary</code> / <code>isCreateDate</code> /
+        <code>isUpdateDate</code>; Prisma's DMMF has <code>@default</code> and <code>@updatedAt</code>.
+        The two rows in that table that break the mirror are exactly the two things a descriptor can see and a
+        decorator cannot. The developer's headline feature is <strong>enabled by the adapter decision he had
+        already approved</strong> — not in competition with it.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule-dash">
+
+<!-- ============================================================
+     ACT II — FAILURE ANALYSIS
+     ============================================================ -->
+<section class="act" id="fail" data-hue="fail">
+  <div class="wrap">
+    <div class="act-head">
+      <div class="act-num">02</div>
+      <div class="act-titles">
+        <div class="act-kicker">lens two · failure analysis</div>
+        <h2>Autopsy on deleted code</h2>
+      </div>
+    </div>
+    <p class="act-blurb">
+      Two bodies on the table: four annoyances the developer had actually hit in production, and one
+      function that was shipped and then removed. The lens asks the only question that matters —
+      <em>do these share a cause of death?</em>
+    </p>
+
+    <!-- symptoms -->
+    <div class="autopsy">
+      <div class="autopsy-head">
+        <span>specimen A — lived experience</span>
+        <span><span class="by u">by user</span></span>
+      </div>
+      <div class="autopsy-body">
+        <ul class="symptoms">
+          <li><b>Setup tax.</b> Four packages, plus the transformer plugin, plus a profile, plus decorating <em>every property</em> — before a single field maps.</li>
+          <li><b>Contentless errors.</b> <span class="mono" style="color:var(--dead)">"Mapping is not found"</span>. No pair, no neighbours, no file, no suggestion.</li>
+          <li><b>Nested silence.</b> Nested mapping needs <code>@AutoMap(() =&gt; T)</code> <em>and</em> a separate <code>createMap</code>. Forget either and you get <span class="mono" style="color:var(--dead)">undefined</span>, silently, at runtime.</li>
+          <li><b>Selector pain.</b> <code>forMember</code> selector and generic types fight the editor rather than helping it.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="autopsy">
+      <div class="autopsy-head">
+        <span>specimen B — the deleted function</span>
+        <span>cause of death</span>
+      </div>
+      <div class="autopsy-body">
+        <div class="specimen"><s>reverseMap()</s> <span class="dim">— shipped in @nartc/automapper, absent from @automapper/core</span></div>
+        <dl class="finding">
+          <dt>mechanism</dt>
+          <dd>Relations are not mirror images. The read side <em>expands</em> to a nested DTO; the write side takes a <em>foreign key id</em>. Auto-reversal produces a map that type-checks and is semantically wrong.</dd>
+          <dt>aggravator</dt>
+          <dd>No schema knowledge to separate DB-owned fields from user-supplied ones — so <code>id</code> and the timestamps get reversed straight back into the write path.</dd>
+          <dt>verdict</dt>
+          <dd>Not a missing feature. A feature that <strong>could not be made correct</strong> on the information the library had.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- convergence figure -->
+    <figure class="fig">
+      <div class="fig-title">fig. 2 — five failures, one cause</div>
+      <svg viewBox="0 0 900 330" role="img" aria-label="Five failure nodes converging on a single root cause: automapper has no schema ground truth">
+        <g font-family="ui-monospace,monospace" font-size="11" fill="#ccd7e3">
+          <text x="0" y="42">setup tax</text>
+          <text x="0" y="98">contentless errors</text>
+          <text x="0" y="154">silent nested undefined</text>
+          <text x="0" y="210">selector type pain</text>
+          <text x="0" y="266">reverseMap deleted</text>
+        </g>
+        <g font-family="ui-monospace,monospace" font-size="9" fill="#4c5866">
+          <text x="0" y="58">"restate what the types already say"</text>
+          <text x="0" y="114">"cannot suggest what it cannot see"</text>
+          <text x="0" y="170">"cannot auto-register a pair"</text>
+          <text x="0" y="226">"no descriptor to infer from"</text>
+          <text x="0" y="282">"cannot tell DB-owned from user-supplied"</text>
+        </g>
+
+        <g fill="none" stroke="#ef6f8c" stroke-width="1" opacity=".65">
+          <path d="M250 38  C 400 38, 430 150, 556 158"/>
+          <path d="M250 94  C 400 94, 430 152, 556 160"/>
+          <path d="M250 150 C 400 150, 440 158, 556 162"/>
+          <path d="M250 206 C 400 206, 430 172, 556 164"/>
+          <path d="M250 262 C 400 262, 430 178, 556 166"/>
+        </g>
+
+        <rect x="556" y="126" width="344" height="76" fill="#0e141c" stroke="#ef6f8c"/>
+        <text x="572" y="152" font-family="ui-monospace,monospace" font-size="10" fill="#ef6f8c" letter-spacing="2">ROOT CAUSE</text>
+        <text x="572" y="176" font-family="ui-monospace,monospace" font-size="14" fill="#eef4fa">no schema ground truth</text>
+        <text x="572" y="193" font-family="ui-monospace,monospace" font-size="9" fill="#7a8899">it cannot verify anything, so it demands you restate everything</text>
+      </svg>
+      <figcaption>
+        Every complaint is downstream of one absence. That is the moment the roadmap stopped being a feature list.
+      </figcaption>
+    </figure>
+
+    <!-- consequences -->
+    <div class="card is-coach" style="border-left:2px solid var(--coach)">
+      <span class="tag">design rule <span class="by c">by coach</span></span>
+      <h4>Errors are a headline feature, not error handling.</h4>
+      <p>
+        Descriptors let us print what automapper structurally cannot: registered neighbours, did-you-mean,
+        the file to fix. And they fire <strong>at boot</strong>, not per request.
+      </p>
+      <div class="errbox"><span class="e">AutomapperError</span>  no mapping registered for <span class="pt">User → ReadUserDto</span>
+
+  <span class="lbl">registered neighbours</span>   User → ListUserDto
+                          User → AdminUserDto
+  <span class="lbl">did you mean</span>            <span class="ok">ReadUserDto</span>  declared at src/users/dto/read-user.dto.ts:12
+  <span class="lbl">fix here</span>                src/users/users.module.ts:8
+
+  <span class="lbl">detected at</span>             <span class="ok">boot</span> — AutomapperModule.forRoot({ validate: true })
+                          <span class="lbl">not</span> at request time, with a real user waiting.</div>
+    </div>
+
+    <div class="cards2">
+      <div class="card is-coach">
+        <span class="tag">consequence of the root cause <span class="by c">by coach</span></span>
+        <h4>Auto-register nested pairs.</h4>
+        <p>
+          The adapter knows <code>User.address</code> is a relation to <code>Address</code>. The DTO descriptor
+          knows <code>ReadUserDto.address</code> is <code>AddressDto</code>. The nested pair is <em>derivable</em> —
+          so register it, or fail at boot naming it. Never silent <code>undefined</code>.
+        </p>
+      </div>
+      <div class="card is-coach">
+        <span class="tag">consequence of the root cause <span class="by c">by coach</span></span>
+        <h4>Typed dependency paths.</h4>
+        <p>
+          <code>deps</code> should be a <code>Path&lt;S&gt;</code> union, not <code>string[]</code>. A typo becomes a
+          compile error. This beats automapper's <code>forMember</code> selector ergonomics on its own ground.
+        </p>
+      </div>
+    </div>
+
+    <!-- KEYSTONE -->
+    <div class="card is-coach" style="border-left:2px solid var(--gold); background:rgba(255,212,121,.045)">
+      <span class="tag" style="color:var(--gold)">keystone <span class="by c">by coach</span></span>
+      <h4 style="color:var(--gold)">Pick(Entity, [...]) — a real runtime class.</h4>
+      <p>
+        The answer to Act I's open question, and it was none of the three candidates. Like Nest's
+        <code>PickType</code>, it returns an actual class at runtime — so there is runtime metadata
+        <em>without a single decorator</em>. It inherits nullability and column names from the entity descriptor,
+        and it makes a DTO <strong>fail to compile</strong> when a column is renamed.
+      </p>
+    </div>
+
+    <div class="codewrap" style="margin:16px 0">
+      <div class="fname"><span>src/users/dto/read-user.dto.ts</span><span class="good">no decorators · no profile · no createMap</span></div>
+      <pre><code><span class="k">export const</span> <span class="t">ReadUserDto</span> <span class="p">=</span> <span class="f">Pick</span><span class="p">(</span><span class="t">User</span><span class="p">, [</span><span class="s">'id'</span><span class="p">,</span> <span class="s">'firstName'</span><span class="p">,</span> <span class="s">'lastName'</span><span class="p">,</span> <span class="s">'address'</span><span class="p">]);</span>
+
+<span class="c">// column renamed in the entity? this line stops compiling. that is the feature.</span></code></pre>
+    </div>
+
+    <!-- the crack -->
+    <div class="autopsy" style="border-color: rgba(242,178,62,.35)">
+      <div class="autopsy-head" style="color: var(--user); border-bottom-color: rgba(242,178,62,.3)">
+        <span>crack found in the design</span>
+        <span><span class="by u">by user</span></span>
+      </div>
+      <div class="autopsy-body">
+        <div class="specimen" style="color:var(--user)">Declaring <code>fullName</code> in the DTO <em>and</em> again in the config is repetitive — two places for one field.</div>
+        <p class="dim" style="margin-top:12px;font-size:.92rem">
+          The third instance of the developer's own recurring question. Not "is this slow" or "is this typed",
+          but <em>where does this thing actually belong?</em>
+        </p>
+      </div>
+    </div>
+
+    <div class="card is-coach">
+      <span class="tag">answer <span class="by c">by coach</span></span>
+      <h4>extend() — the resolver <em>is</em> the declaration.</h4>
+      <p>
+        One object gives TypeScript the field type (inferred from the compute return type) and gives the runtime
+        both the field list and the resolver. <code>export const</code> + <code>export type</code> declaration
+        merging keeps it usable as a class.
+      </p>
+      <div class="codewrap" style="margin-top:14px">
+        <div class="fname"><span>one declaration site, not two</span><span class="good">type inferred from the resolver</span></div>
+        <pre><code><span class="k">export const</span> <span class="t">ReadUserDto</span> <span class="p">=</span> <span class="f">Pick</span><span class="p">(</span><span class="t">User</span><span class="p">, [</span><span class="s">'id'</span><span class="p">,</span> <span class="s">'address'</span><span class="p">])</span>
+  <span class="p">.</span><span class="f">extend</span><span class="p">({</span>
+    <span class="f">fullName</span><span class="p">:</span> <span class="p">(</span>u<span class="p">) =&gt;</span> <span class="s">`${u.firstName} ${u.lastName}`</span><span class="p">,</span>  <span class="c">// : string, inferred</span>
+    <span class="f">email</span><span class="p">:</span>    <span class="f">visible</span><span class="p">(</span>ctx <span class="p">=&gt;</span> ctx<span class="p">.</span>isAdmin<span class="p">,</span> u <span class="p">=&gt;</span> u<span class="p">.</span>email<span class="p">),</span> <span class="c">// : string | undefined</span>
+  <span class="p">});</span>
+
+<span class="k">export type</span> <span class="t">ReadUserDto</span> <span class="p">=</span> <span class="t">InstanceType</span><span class="p">&lt;</span><span class="k">typeof</span> <span class="t">ReadUserDto</span><span class="p">&gt;;</span></code></pre>
+      </div>
+    </div>
+
+    <div class="cards2">
+      <div class="card is-coach" style="border-left:2px solid var(--dead)">
+        <span class="tag" style="color:var(--dead)">cost of extend() <span class="by c">by coach</span></span>
+        <h4>A field with no syntactic declaration site cannot carry <code>@ApiProperty</code>.</h4>
+        <p>Which breaks Swagger for Nest users — the exact audience. It also blocks one DTO mapped from two different sources.</p>
+      </div>
+      <div class="card is-coach" style="border-left:2px solid var(--coach)">
+        <span class="tag" style="color:var(--coach)">answer to the cost <span class="by c">by coach</span></span>
+        <h4>Generate the OpenAPI schema <em>from</em> the descriptor.</h4>
+        <p><code>schemaOf(ReadUserDto)</code>. We already know types, nullability and enums. The cost turns into another differentiator.</p>
+      </div>
+    </div>
+
+    <div class="cards2">
+      <div class="card is-coach">
+        <span class="tag">runtime check → type error <span class="by c">by coach</span></span>
+        <h4><code>visible()</code> widens to <code>T | undefined</code>.</h4>
+        <p>
+          So the inferred DTO type is <em>honest</em>. This replaces DESIGN.md open question 2 outright:
+          "strict rejects <code>visible()</code> on required fields" stops being a runtime rule and becomes a type error.
+        </p>
+      </div>
+      <div class="card is-coach">
+        <span class="tag">runtime throw → editor squiggle <span class="by c">by coach</span></span>
+        <h4><code>resolve()</code> brands the DTO async.</h4>
+        <p>
+          It unwraps to <code>Awaited&lt;R&gt;</code> and marks the DTO. Calling <code>mapper.map()</code> on an async
+          DTO becomes a <strong>compile</strong> error — upgrading decision 5 from a runtime throw to a red underline.
+        </p>
+      </div>
+    </div>
+
+    <!-- pre-echo of act III -->
+    <div class="card" style="border-style:dashed; border-color: rgba(182,166,247,.4); background: rgba(182,166,247,.04)">
+      <span class="tag" style="color:var(--dst)">logged here, belongs to the next lens <span class="by c">by coach</span></span>
+      <h4 style="color:var(--dst)">Radical flip: if the DTO determines the SELECT, never hydrate an entity at all.</h4>
+      <p>
+        <code>mapper.query(User, ReadUserDto, { where })</code> compiles the DTO shape straight to SQL; rows map in a
+        single pass. The mapper stops being an object transformer and becomes a <strong>DTO-to-query compiler</strong>.
+      </p>
+      <p class="dim" style="font-size:.88rem">
+        It arrived before the technique switch — the session ran ahead of its own agenda. Remember it: it comes
+        back at the end as the strongest idea nobody is allowed to build yet.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule-dash">
+
+<!-- ============================================================
+     ACT III — ASSUMPTION REVERSAL
+     ============================================================ -->
+<section class="act" id="flip" data-hue="flip">
+  <div class="wrap">
+    <div class="act-head">
+      <div class="act-num">03</div>
+      <div class="act-titles">
+        <div class="act-kicker">lens three · assumption reversal</div>
+        <h2>Turning the foundations over</h2>
+      </div>
+    </div>
+    <p class="act-blurb">
+      Every mapping library since AutoMapper for .NET has assumed you register a pair. The lens asks what
+      survives if you simply don't.
+    </p>
+
+    <div class="flip">
+      <div class="flip-was">
+        <div class="lab">assumption 1</div>
+        <p><span class="struck">You must call createMap(source, destination) to register a pair.</span></p>
+      </div>
+      <div class="flip-now">
+        <div class="lab">reversed <span class="by c">by coach</span></div>
+        <p>
+          Never call <code>createMap</code>. <code>Pick(User, ...)</code> <em>already names the source</em> —
+          so <strong>the DTO is the registration</strong>. Profiles survive only for multi-source DTOs.
+        </p>
+      </div>
+    </div>
+
+    <div class="flip">
+      <div class="flip-was">
+        <div class="lab">the objection this raises</div>
+        <p><span class="struck">Lazy registration pushes strict errors to first call — you lose boot-time safety.</span></p>
+      </div>
+      <div class="flip-now">
+        <div class="lab">absorbed <span class="by c">by coach</span></div>
+        <p>
+          A boot-time sweep. <code>AutomapperModule.forRoot({ validate: true })</code> builds <em>every</em> plan on
+          <code>onModuleInit</code> and fails the boot; <code>npx automapper check</code> does the same in CI.
+          Boot-time strictness with zero <code>createMap</code>.
+        </p>
+      </div>
+    </div>
+
+    <p class="act-blurb" style="margin-top:34px">
+      Composed with everything before it, the read path collapses to a DTO definition and a one-line controller.
+      Here is the whole diff against the incumbent.
+    </p>
+
+    <div class="side-by-side">
+      <div class="codewrap">
+        <div class="fname"><span>@automapper/core — today</span><span class="cnt bad">7 steps before one field maps</span></div>
+        <pre><code><span class="c">// 1 · four packages</span>
+<span class="p">npm i</span> @automapper/core @automapper/classes
+       @automapper/nestjs @automapper/types
+
+<span class="c">// 2 · transformer plugin — nest-cli.json</span>
+<span class="s">"plugins"</span><span class="p">: [</span><span class="s">"@automapper/classes/transformer-plugin"</span><span class="p">]</span>
+
+<span class="c">// 3 · decorate every property, on both sides</span>
+<span class="k">class</span> <span class="t">User</span> <span class="p">{</span>
+  <span class="d">@AutoMap</span><span class="p">()</span> id<span class="p">:</span> <span class="t">string</span><span class="p">;</span>
+  <span class="d">@AutoMap</span><span class="p">()</span> firstName<span class="p">:</span> <span class="t">string</span><span class="p">;</span>
+  <span class="d">@AutoMap</span><span class="p">()</span> lastName<span class="p">:</span> <span class="t">string</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c">// 4 · nested needs the type thunk — or silent undefined</span>
+<span class="d">@AutoMap</span><span class="p">(() =&gt;</span> <span class="t">Address</span><span class="p">)</span> address<span class="p">:</span> <span class="t">Address</span><span class="p">;</span>
+
+<span class="c">// 5 · a profile class</span>
+<span class="d">@Injectable</span><span class="p">()</span>
+<span class="k">export class</span> <span class="t">UserProfile</span> <span class="k">extends</span> <span class="t">AutomapperProfile</span> <span class="p">{ … }</span>
+
+<span class="c">// 6 · createMap per pair — and again for every nested pair</span>
+<span class="f">createMap</span><span class="p">(</span>mapper<span class="p">,</span> <span class="t">User</span><span class="p">,</span> <span class="t">ReadUserDto</span><span class="p">);</span>
+<span class="f">createMap</span><span class="p">(</span>mapper<span class="p">,</span> <span class="t">Address</span><span class="p">,</span> <span class="t">AddressDto</span><span class="p">);</span> <span class="x">// forget = undefined</span>
+
+<span class="c">// 7 · forMember for anything computed</span>
+<span class="f">forMember</span><span class="p">(</span>d <span class="p">=&gt;</span> d<span class="p">.</span>fullName<span class="p">,</span>
+  <span class="f">mapFrom</span><span class="p">(</span>s <span class="p">=&gt;</span> <span class="s">`${s.firstName} ${s.lastName}`</span><span class="p">))</span>
+<span class="x">// ↑ fullName also declared on the DTO. two places, one field.</span></code></pre>
+      </div>
+
+      <div class="codewrap">
+        <div class="fname"><span>@nestjs-automapper — proposed</span><span class="cnt good">4 steps, one of them is the controller</span></div>
+        <pre><code><span class="c">// 1 · the DTO is a Pick of the entity — and IS the registration</span>
+<span class="k">export const</span> <span class="t">ReadUserDto</span> <span class="p">=</span> <span class="f">Pick</span><span class="p">(</span><span class="t">User</span><span class="p">, [</span><span class="s">'id'</span><span class="p">,</span> <span class="s">'address'</span><span class="p">])</span>
+
+<span class="c">// 2 · computed fields: the resolver IS the declaration</span>
+  <span class="p">.</span><span class="f">extend</span><span class="p">({</span>
+    <span class="f">fullName</span><span class="p">:</span> <span class="p">(</span>u<span class="p">) =&gt;</span> <span class="s">`${u.firstName} ${u.lastName}`</span><span class="p">,</span>
+  <span class="p">});</span>
+<span class="k">export type</span> <span class="t">ReadUserDto</span> <span class="p">=</span> <span class="t">InstanceType</span><span class="p">&lt;</span><span class="k">typeof</span> <span class="t">ReadUserDto</span><span class="p">&gt;;</span>
+
+<span class="c">// 3 · one module option — boot fails if any plan is unbuildable</span>
+<span class="t">AutomapperModule</span><span class="p">.</span><span class="f">forRoot</span><span class="p">({</span> <span class="f">validate</span><span class="p">:</span> <span class="k">true</span> <span class="p">});</span>
+<span class="c">//   $ npx automapper check   ← same sweep, in CI</span>
+
+<span class="c">// 4 · the controller</span>
+<span class="d">@Get</span><span class="p">()</span>
+<span class="f">list</span><span class="p">() {</span>
+  <span class="k">return</span> <span class="k">this</span><span class="p">.</span>users<span class="p">.</span><span class="f">projectionFor</span><span class="p">(</span><span class="t">ReadUserDto</span><span class="p">).</span><span class="f">find</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="g">// no decorators.        no transformer plugin.</span>
+<span class="g">// no profile.           no @AutoMap(() =&gt; T).</span>
+<span class="g">// no createMap.         nested pair auto-registered.</span>
+<span class="g">// address relation resolved from the schema, not from you.</span></code></pre>
+      </div>
+    </div>
+
+    <div class="card is-coach">
+      <span class="tag">composite hello-world <span class="by c">by coach</span></span>
+      <p>
+        <code>Pick</code> + <code>extend</code> + no-<code>createMap</code> + <code>query()</code> reduces the entire
+        read path to <strong>a DTO definition plus a one-line controller</strong>: no decorators, no profile, no
+        createMap, no transformer plugin, no <code>repo.find</code>, no entity hydration.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule-dash">
+
+<!-- ============================================================
+     ACT IV — MoSCoW
+     ============================================================ -->
+<section class="act" id="scope" data-hue="scope">
+  <div class="wrap">
+    <div class="act-head">
+      <div class="act-num">04</div>
+      <div class="act-titles">
+        <div class="act-kicker">convergence · MoSCoW</div>
+        <h2>The build ladder</h2>
+      </div>
+    </div>
+    <p class="act-blurb">
+      Divergence over. Everything above gets sorted into what 2.0 <em>is</em>, what it gets if there is time,
+      what waits, and what — however good — does not get built.
+      Every decision on this ladder was the developer's; the plan was <strong>approved as-is</strong>.
+    </p>
+
+    <div class="ladder">
+      <div class="rung must">
+        <div class="rung-key">
+          <div class="tier">MUST</div>
+          <div class="when">2.0 · non-negotiable</div>
+          <div class="n">10 items</div>
+        </div>
+        <div class="rung-items">
+          <ol>
+            <li><span class="idx">01</span><span class="what"><b>Pick(Entity, [...])</b><span>a runtime-real DTO class — the keystone everything else stands on</span></span></li>
+            <li><span class="idx">02</span><span class="what"><b>extend()</b><span>the resolver is the declaration; one field, one place</span></span></li>
+            <li><span class="idx">03</span><span class="what"><b>error quality</b><span>did-you-mean, registered neighbours, file pointer</span></span></li>
+            <li><span class="idx">04</span><span class="what"><b>boot-time validation sweep</b><span>validate: true, plus npx automapper check for CI</span></span></li>
+            <li><span class="idx">05</span><span class="what"><b>projection push-down</b><span>projectionFor / @Projection</span></span></li>
+            <li><span class="idx">06</span><span class="what"><b>typed dep paths</b><span>Path&lt;S&gt;, not string[]</span></span></li>
+            <li><span class="idx">07</span><span class="what"><b>auto-register nested pairs</b><span>derive it, or fail at boot naming it — never silent undefined</span></span></li>
+            <li><span class="idx">08</span><span class="what"><b>per-operation identity map</b><span>the cache with a lifetime too short to go stale</span></span></li>
+            <li><span class="idx">09</span><span class="what"><b>reverse map — scalars only</b><span>dropping id, timestamps and generated columns</span></span></li>
+            <li><span class="idx">10</span><span class="what"><b>schemaOf(Dto)</b><span>OpenAPI generated from the descriptor — promoted from COULD after the intent doc caught that extend() removes the declaration site @ApiProperty needs</span></span></li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="rung should">
+        <div class="rung-key">
+          <div class="tier">SHOULD</div>
+          <div class="when">2.0 if time</div>
+          <div class="n">4 items</div>
+        </div>
+        <div class="rung-items">
+          <ol start="11">
+            <li><span class="idx">11</span><span class="what"><b>no createMap</b><span>the DTO is the registration</span></span></li>
+            <li><span class="idx">12</span><span class="what"><b>context-gated fields</b><span>visible() with T | undefined widening</span></span></li>
+            <li><span class="idx">13</span><span class="what"><b>class-validator as SchemaAdapter</b><span>for DTOs that aren't a Pick</span></span></li>
+            <li><span class="idx">14</span><span class="what"><b>reverse map for relations → foreign keys</b><span>the exact half that killed automapper's version</span></span></li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="rung could">
+        <div class="rung-key">
+          <div class="tier">COULD</div>
+          <div class="when">2.1 and beyond</div>
+          <div class="n">2 items</div>
+        </div>
+        <div class="rung-items">
+          <ol start="15">
+            <li><span class="idx">15</span><span class="what"><b>resolve() async branding</b><span>mapping an async DTO synchronously becomes a compile error</span></span></li>
+            <li><span class="idx">16</span><span class="what"><b>deps optional until projectionFor</b><span>separation in time, from Act I</span></span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- THE WON'T -->
+    <div class="wont">
+      <div class="wont-inner">
+        <span class="stamp">won't · this time</span>
+        <h3>mapper.query(User, Dto, { where }) — the DTO-to-query compiler</h3>
+        <p class="verdict">
+          <strong>Judged the strongest idea of the session.</strong> Deliberately not built.
+        </p>
+        <div class="codewrap" style="margin-top:20px; border-color: rgba(255,212,121,.28)">
+          <div class="fname" style="border-bottom-color: rgba(255,212,121,.22)"><span>the idea that won and was shelved anyway</span><span style="color:var(--gold)">revisit as 3.0</span></div>
+          <pre><code><span class="c">// no repo.find. no entity hydration. the DTO shape IS the SELECT.</span>
+<span class="k">const</span> rows <span class="p">=</span> <span class="k">await</span> mapper<span class="p">.</span><span class="f">query</span><span class="p">(</span><span class="t">User</span><span class="p">,</span> <span class="t">ReadUserDto</span><span class="p">, {</span> <span class="f">where</span><span class="p">: {</span> <span class="f">active</span><span class="p">:</span> <span class="k">true</span> <span class="p">} });</span>
+<span class="c">//    ↑ compiles straight to SQL, rows map in one pass</span></code></pre>
+        </div>
+        <div class="wont-grid">
+          <div>
+            <div class="h">why it won</div>
+            <p>It is the logical end of the schema-ground-truth thesis. If the library truly knows your schema, hydrating an entity just to throw most of it away is waste.</p>
+          </div>
+          <div>
+            <div class="h">why it's shelved</div>
+            <p>It turns a mapper into a query builder — dialects, joins, pagination. That is a different product with a different maintenance surface.</p>
+          </div>
+          <div>
+            <div class="h">what covers it meanwhile</div>
+            <p>Projection push-down (MUST #5) proves the same claim far more cheaply. The demo lands; the query engine doesn't have to be written.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SYNTHESIS — the climax
+     ============================================================ -->
+<section class="synth act" id="synthesis" data-hue="synth">
+  <div class="wrap">
+    <div class="act-head">
+      <div class="act-num">05</div>
+      <div class="act-titles">
+        <div class="act-kicker">synthesis · the through-line</div>
+        <h2>One capability, not sixteen features</h2>
+      </div>
+    </div>
+
+    <p class="claim">
+      Not <span class="strike">a mapper with more features</span>.<br>
+      <span class="gold">The mapper that knows your schema.</span>
+    </p>
+
+    <p class="act-blurb" style="margin-top:26px; max-width:74ch">
+      Every annoyance the developer hit — the setup tax, the contentless errors, the silent nested undefined,
+      the selector type pain — <em>and</em> the deletion of <code>reverseMap</code> trace to the same absence.
+      Which means the sixteen items on that ladder are not a wish list. They are consequences.
+      Ship the capability and they follow; ship them individually and you have built a competitor's changelog.
+    </p>
+
+    <figure class="fig" style="margin-top:30px">
+      <div class="fig-title">fig. 3 — the derivation, not the backlog</div>
+      <svg viewBox="0 0 900 300" role="img" aria-label="One capability, schema ground truth, deriving each MUST item as a consequence">
+        <rect x="0" y="118" width="238" height="64" fill="#0e141c" stroke="#ffd479"/>
+        <text x="16" y="142" font-family="ui-monospace,monospace" font-size="10" fill="#ffd479" letter-spacing="2">THE CAPABILITY</text>
+        <text x="16" y="166" font-family="ui-monospace,monospace" font-size="14" fill="#eef4fa">schema ground truth</text>
+
+        <g fill="none" stroke="#ffd479" stroke-width="1" opacity=".42">
+          <path d="M238 150 C 320 150, 340 26,  420 26"/>
+          <path d="M238 150 C 320 150, 340 57,  420 57"/>
+          <path d="M238 150 C 320 150, 340 88,  420 88"/>
+          <path d="M238 150 C 320 150, 340 119, 420 119"/>
+          <path d="M238 150 C 320 150, 340 150, 420 150"/>
+          <path d="M238 150 C 320 150, 340 181, 420 181"/>
+          <path d="M238 150 C 320 150, 340 212, 420 212"/>
+          <path d="M238 150 C 320 150, 340 243, 420 243"/>
+          <path d="M238 150 C 320 150, 340 274, 420 274"/>
+        </g>
+
+        <g font-family="ui-monospace,monospace" font-size="11.5" fill="#ccd7e3">
+          <text x="430" y="30">Pick() — the descriptor made into a class</text>
+          <text x="430" y="61">extend() — types inferred, not restated</text>
+          <text x="430" y="92">errors that name neighbours and files</text>
+          <text x="430" y="123">boot sweep — every plan buildable</text>
+          <text x="430" y="154">projection push-down — DTO decides SELECT</text>
+          <text x="430" y="185">Path&lt;S&gt; deps — typo is a compile error</text>
+          <text x="430" y="216">nested pairs auto-registered</text>
+          <text x="430" y="247">identity map — one operation wide</text>
+          <text x="430" y="278">reverse map — because DB-owned is knowable</text>
+        </g>
+      </svg>
+      <figcaption>Nine MUSTs. One reason. That is what makes a roadmap coherent rather than a feature list.</figcaption>
+    </figure>
+
+    <div class="cards2" style="margin-top:26px">
+      <div class="card is-user" style="border-left:2px solid var(--user)">
+        <span class="tag">synergy the developer found without naming it <span class="by c">by coach</span></span>
+        <h4>Precondition and payoff, mistaken for two ideas.</h4>
+        <p>
+          His headline ask — <strong>reverse mapping</strong> — is only correctly implementable
+          <em>because of</em> the schema-adapter decision he had already approved. He thought he had two features.
+          He had one feature and its enabling condition.
+        </p>
+      </div>
+      <div class="card is-user" style="border-left:2px solid var(--user)">
+        <span class="tag">synergy from his own contradiction <span class="by c">by coach</span></span>
+        <h4>One object, three unrelated problems.</h4>
+        <p>
+          His caching-vs-correctness contradiction produced the <strong>per-operation identity map</strong>, which
+          independently solves cycle detection, nested-object dedupe, and async resolver batching.
+        </p>
+      </div>
+    </div>
+
+    <!-- the meta-pattern -->
+    <div class="pattern">
+      <span class="tag" style="color:var(--user)">the pattern behind his three sharpest moves <span class="by c">by coach</span></span>
+      <p class="dim" style="margin:0">Cache staleness. Validation lifetime. The fullName repetition. Three different subsystems, one question:</p>
+      <div class="q">“what is the correct LIFETIME<br>or DECLARATION SITE for this thing?”</div>
+      <p class="dim" style="margin:0">
+        That question, not any single idea, is the session's real method — and it should be pointed at every
+        future feature before it ships.
+      </p>
+    </div>
+
+    <div class="sharpest">
+      <div class="sharp">
+        <div class="n">SHARPEST · 01</div>
+        <h4>Cache vs correctness</h4>
+        <p>Named the contradiction that killed his own feature and produced the identity map that replaced it.</p>
+      </div>
+      <div class="sharp">
+        <div class="n">SHARPEST · 02</div>
+        <h4>Validation lifetime</h4>
+        <p>Spotted the same defect in a second subsystem, unprompted — which is what turned it from a fix into a rule.</p>
+      </div>
+      <div class="sharp">
+        <div class="n">SHARPEST · 03</div>
+        <h4>The fullName repetition</h4>
+        <p>Cracked the new design one field in. Two places for one field — which produced <code>extend()</code>.</p>
+      </div>
+    </div>
+
+    <div class="ledger">
+      <div><div class="big">39</div><div class="lbl">logged moves</div></div>
+      <div><div class="big u">11</div><div class="lbl">his</div></div>
+      <div><div class="big c">28</div><div class="lbl">the coach's</div></div>
+      <div><div class="big">2</div><div class="lbl">ideas cut, as invited</div></div>
+      <div><div class="big">4</div><div class="lbl">MoSCoW decisions — all his</div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-line">
+      <span>brainstorm-automapper-differentiation · 2026-09-08 · complete</span>
+      <span>next: 2.0 starts at MUST #1</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // mark cards by attribution so the spotlight has something to grab
+  document.querySelectorAll('.card').forEach(function (c) {
+    if (c.querySelector('.by.u')) c.classList.add('is-user');
+  });
+  var btn = document.getElementById('spot');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var on = document.body.classList.toggle('spot');
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.textContent = on ? 'spotlight: on — showing his moves' : 'spotlight: the developer';
+  });
+})();
+</script>
+
+</body>
+</html>
