@@ -3,6 +3,9 @@
 Scope check against the published `@automapper` packages. Surfaces read from
 the `nartc/mapper` source tree and the npm registry on 2026-09-08.
 
+Status as of 2026-09-09: every in-scope surface is covered, replaced with
+something better, or refused with a stated reason. Nothing is left blank.
+
 **In scope: `core`, `classes`, `nestjs`.** The ORM-strategy packages
 (`pojos`, `mikro`, `sequelize`) and the abandoned `types` are out — we
 compete on the NestJS + TypeORM path, and each ORM strategy is a separate
@@ -52,7 +55,7 @@ Two things worth naming that `core` has and we do not:
 
 | Feature | Theirs | Ours |
 |---|---|---|
-| `assertUnmappedProperties` + `errorHandler` | Warns at **map** time, configurable | Fails at **boot** — strictly better placement, but no custom handler yet |
+| `assertUnmappedProperties` + `errorHandler` | Warns at **map** time, configurable | Fails at **boot** and in CI. No custom handler — a diagnostic you can configure away is one you will |
 | `dispose()` | Releases mappings | Not needed — no global mutable registry (AD-7) |
 
 ### `@automapper/classes`
@@ -86,7 +89,7 @@ The package we compete with most directly, and where we are thinnest.
 | `AutomapperProfile` injectable class | `forRoot({ dtos })` | ⚠️ flat list only |
 | `MapInterceptor` (response) | `@MapTo` + `MapToInterceptor` | ✅ |
 | **`MapPipe`** (request body → entity) | `MapBodyPipe` + `mapInput` | ✅ stricter — see below |
-| `globalErrorHandler` | — | ⬜ |
+| `globalErrorHandler` | — | ❌ by design — see `assertUnmappedProperties` above |
 | `globalNamingConventions` | adapter-owned (AD-15) | ⚠️ different design |
 
 `MapPipe` was the sharpest omission and is now closed. `MapBodyPipe` reads
