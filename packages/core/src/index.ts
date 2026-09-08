@@ -62,3 +62,7 @@ export type { PlanReport, MapOptions } from './mapper.js';
 
 // --- direction policy (AD-14) ---
 export { writeDropReason, writableFields, isHiddenOnRead } from './policy.js';
+
+// --- OpenAPI back-end (CAP-9) ---
+export { schemaOf } from './schema/openapi.js';
+export type { OpenApiSchema, SchemaOptions, OpenApiVersion } from './schema/openapi.js';
