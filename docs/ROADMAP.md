@@ -6,7 +6,7 @@ add that it does not have.
 **Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
 **Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
 
-Last updated: 2026-09-09 · branch `v2` · 109 tests passing
+Last updated: 2026-09-09 · branch `v2` · 131 tests passing · **all phases complete**
 
 ---
 
@@ -20,10 +20,10 @@ Last updated: 2026-09-09 · branch `v2` · 109 tests passing
 | **3** | Codegen emitter | — | ✅ done |
 | **4** | Projector + TypeORM adapter | CAP-5 | ✅ done · CAP-6 pending |
 | **5** | `Mapper` facade, NestJS module, seal lifecycle | CAP-3 | ✅ done · CLI pending |
-| **6** | Write path, drop-list policy, `forRootAsync` | CAP-8 | ✅ done · reverse() pending |
-| **7** | `schemaOf` → OpenAPI | CAP-9 | ⬜ next |
-| **8** | Nested/collection + identity map | CAP-6, CAP-7 | ⬜ |
-| **9** | Named mappers, getter-only fields | — | ⬜ |
+| **6** | Write path, drop-list policy, `forRootAsync` | CAP-8 | ✅ done |
+| **7** | `schemaOf` → OpenAPI | CAP-9 | ✅ done |
+| **8** | Nested/collection + identity map | CAP-6, CAP-7 | ✅ done |
+| **9** | Named mappers, `automapper check` CLI | CAP-3 | ✅ done |
 
 ### Phase 0 — Workspace ✅
 
@@ -106,18 +106,36 @@ database-owned keys** — mass-assignment protection derived from the schema.
 Still pending: `reverse(ReadDto)` deriving a write DTO automatically. The
 policy and enforcement exist; only the derivation helper is missing.
 
-### Phase 7 — OpenAPI ⬜
+### Phase 7 — OpenAPI ✅
 
 `schemaOf(Dto)` from the descriptor. Promoted to MUST because `extend`
 removes the syntactic declaration site `@ApiProperty` needs, so shipping
 `extend` without it would ship a Swagger regression.
 
-### Phase 8 — Graphs ⬜
+### Phase 8 — Graphs ✅
 
-`nested()`/`collection()` resolvers, then CAP-6 auto-registration and the
-per-operation identity map: cycle detection by ancestor chain, nested dedupe,
-resolver memoisation (AD-7). Deliberately last — every piece of it is
-unreachable until nested nodes have a producer.
+`nested()` and `collection()` lower to relation nodes; `seal()` closes over
+the DTOs they reference so a nested pair never needs registering by hand
+(CAP-6). Child plans are linked by value afterwards, and the `isAsync`
+fixpoint runs in the same pass.
+
+One identity map replaces AD-7's ancestor chain: the destination is inserted
+before its fields are filled, so a back-edge finds the in-progress instance
+and a shared reference maps once and is shared. Same guarantees, less
+machinery.
+
+### Phase 9 — Named mappers + CLI ✅
+
+`getMapperToken(name)` and `InjectMapper(name)` for multi-context apps.
+`automapper check <module>` boots the app context so CI validates the same
+pair set the running app seals — completing CAP-3's second half.
+
+**`isGetterOnly` refused.** Auto-mapping entity getters is unsafe under
+projection: a getter's source columns cannot be inferred, so projecting one
+fetches nothing and it computes from unfetched fields — the exact
+under-fetch CAP-5 exists to prevent. Getters are supported through
+`compute(['firstName','lastName'], u => u.fullName)`, where the deps are
+declared.
 
 ---
 
@@ -213,7 +231,7 @@ Kept as a record of what earned its keep.
 
 ## 5. Known gaps
 
+- **A self-referencing DTO** needs its relation thunk annotated (`(): unknown => Dto`), or the class lands in its own base expression (TS2506). Runtime is unaffected.
 - **`describe()` has no live-DataSource test.** `toFindOptions` is pure and tested; `describe()` needs a real driver. Mocking TypeORM's metadata classes would only test the mock.
-- **No `automapper check` CLI**, so CAP-3 is met at boot but not yet in CI.
 - **Implicit primary key in projections.** Nothing yet adds the PK when a DTO omits it. TypeORM often needs it to hydrate relations.
 - **`@nestjs-automapper` npm org not created.** Package names verified free; the org needs `npm org create` under your account.

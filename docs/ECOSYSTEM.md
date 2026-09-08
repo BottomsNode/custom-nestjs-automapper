@@ -61,13 +61,17 @@ Two things worth naming that `core` has and we do not:
 |---|---|---|
 | `@AutoMap()` per property | `Pick(Entity, [...])` | ✅ replaced |
 | `@AutoMap({ type })` nested type hint | adapter relation metadata | ✅ replaced |
-| `@AutoMap({ depth })` recursion depth | depth ceiling (AD-7) | ⬜ Phase 8 |
-| `@AutoMap({ isGetterOnly })` | — | ⬜ **new gap** — entities with computed getters |
+| `@AutoMap({ depth })` recursion depth | depth ceiling + identity map | ✅ |
+| `@AutoMap({ isGetterOnly })` | `compute()` with declared deps | ⚠️ refused by design — see below |
 | `classes()` strategy initializer | schema adapters | ✅ replaced |
 | **ts transformer plugin** | not required | ✅ removed by design |
 
-`isGetterOnly` is a genuine miss: a `get fullName()` on an entity is a real
-pattern, and our adapter reads columns only, so it never sees one.
+`isGetterOnly` is **deliberately not supported**. Auto-mapping a getter is
+unsafe under projection: its source columns cannot be inferred, so the
+projector would fetch nothing for it and the getter would compute from
+unfetched fields — the exact under-fetch CAP-5 exists to prevent. Getters are
+reachable through `compute(['firstName','lastName'], u => u.fullName)`, where
+the deps are declared and the projection is therefore correct.
 
 ### `@automapper/nestjs`
 
@@ -78,7 +82,7 @@ The package we compete with most directly, and where we are thinnest.
 | `AutomapperModule.forRoot` | ✅ | ✅ |
 | **`forRootAsync`** (`useFactory`, `inject`) | ✅ | ✅ · `useClass`/`useExisting` pending |
 | `@InjectMapper()` | ✅ | ✅ |
-| `getMapperToken(name)` — **named mappers** | single mapper | ⬜ **new gap** |
+| `getMapperToken(name)` — named mappers | ✅ | ✅ |
 | `AutomapperProfile` injectable class | `forRoot({ dtos })` | ⚠️ flat list only |
 | `MapInterceptor` (response) | `@MapTo` + `MapToInterceptor` | ✅ |
 | **`MapPipe`** (request body → entity) | `MapBodyPipe` + `mapInput` | ✅ stricter — see below |
@@ -128,8 +132,8 @@ Four items enter the roadmap; two are deferred.
 |---|---|---|---|
 | 1 | ~~Write path~~ | Done — `Write()`, `mapInput`, `MapBodyPipe`. | ✅ Phase 6 |
 | 2 | ~~`forRootAsync`~~ | Done (`useFactory` + `inject`). | ✅ Phase 6 |
-| 3 | **Named mappers** (`getMapperToken`) | Multi-tenant and multi-context apps. | Phase 9 |
-| 4 | **`isGetterOnly`** | A `get fullName()` on an entity is a real pattern our adapter cannot see. | Phase 9 |
+| 3 | ~~Named mappers~~ | Done. | ✅ Phase 9 |
+| 4 | ~~`isGetterOnly`~~ | Refused — unsafe under projection. | ❌ by design |
 | — | `defineSchema()` / `TypeToken` | Deferred with Prisma — see §1. | 2.1 |
 | — | Proxy unwrapping | Deferred with the ORMs that need it. | post-2.0 |
 

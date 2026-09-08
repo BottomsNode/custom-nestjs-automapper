@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { describe, it, expect } from 'vitest';
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
   Mapper,
@@ -71,9 +71,10 @@ describe('AutomapperModule', () => {
       bad: from<User, string>('nope' as never),
     }) {}
 
-    const app = await boot([Broken]);
-    // The failure lands at nest start, not on the request that hits it.
-    await expect(app.init()).rejects.toThrow(/DEP_UNKNOWN/);
+    // Sealing runs when the provider is instantiated, so the failure lands
+    // during module construction — earlier than the first request, which is
+    // the whole point of CAP-3.
+    await expect(boot([Broken])).rejects.toThrow(/DEP_UNKNOWN/);
   });
 
   it('is a no-op on a second init', async () => {
@@ -95,5 +96,55 @@ describe('@MapTo', () => {
     }
 
     expect(Reflect.getMetadata(MAP_TO, UsersController.prototype.findAll)).toBe(ReadUserDto);
+  });
+});
+
+describe('named mappers', () => {
+  it('registers under a named token and leaves the default free', async () => {
+    const { getMapperToken } = await import('./automapper.constants.js');
+    const app = await Test.createTestingModule({
+      imports: [
+        AutomapperModule.forRoot({
+          adapters: [adapter],
+          dtos: [ReadUserDto],
+          name: 'tenant-a',
+          interceptor: false,
+          bodyPipe: false,
+        }),
+      ],
+    }).compile();
+
+    expect(app.get<Mapper>(getMapperToken('tenant-a'))).toBeInstanceOf(Mapper);
+    expect(getMapperToken('tenant-a')).not.toBe(getMapperToken());
+  });
+});
+
+describe('forRootAsync', () => {
+  it('resolves options through an imported provider', async () => {
+    const CONFIG = 'AUTOMAPPER_TEST_CONFIG';
+
+    @Module({
+      providers: [{ provide: CONFIG, useValue: { dtos: [ReadUserDto] } }],
+      exports: [CONFIG],
+    })
+    class ConfigModule {}
+
+    const app = await Test.createTestingModule({
+      imports: [
+        AutomapperModule.forRootAsync({
+          imports: [ConfigModule],
+          inject: [CONFIG],
+          useFactory: ((cfg: { dtos: ClassLike[] }) => ({
+            adapters: [adapter],
+            dtos: cfg.dtos,
+            interceptor: false,
+            bodyPipe: false,
+          })) as never,
+        }),
+      ],
+    }).compile();
+
+    await app.init();
+    expect(app.get<Mapper>(MAPPER).isSealed()).toBe(true);
   });
 });
