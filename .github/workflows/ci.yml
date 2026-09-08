@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [master, v2]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.3.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Emit line. `.bin/tsc` is TypeScript 7, so this goes through tsc6.mjs,
+      # which fails loudly if it ever resolves a non-6.x compiler.
+      - name: Typecheck (TypeScript 6)
+        run: pnpm -r --workspace-concurrency=1 exec node ../../scripts/tsc6.mjs -p tsconfig.json --noEmit
+
+      # Consumers will be on 7.x even though it cannot build the packages.
+      - name: Typecheck (TypeScript 7)
+        run: pnpm -r --workspace-concurrency=1 exec node ../../scripts/typecheck-ts7.mjs
+
+      - run: pnpm test
+
+      - run: pnpm -r --workspace-concurrency=1 exec node ../../scripts/build-package.mjs
+
+      - name: Dependency invariants (AD-6)
+        run: node scripts/check-zero-deps.mjs

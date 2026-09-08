@@ -1,336 +1,110 @@
-# @custom-automapper
+# @nestjs-automapper
 
-A **powerful, type-safe, extensible object mapping library** for **TypeScript** and **NestJS**, built for real-world production use.  
-It supports decorators, caching, async mapping, validation, and more — all without the @automapper/core dependency.
+The mapper that knows your schema.
 
----
+An object mapper for TypeScript and NestJS that reads your ORM's metadata, so
+it can do things a mapper without schema knowledge structurally cannot: check
+every mapping at boot, derive the `SELECT` from the DTO, and refuse fields the
+database owns.
 
-## ✨ Features
-
-- 🧩 **Automatic mapping** of DTOs using decorators
-- ⚡ **Caching support** for high-performance repeated mappings
-- 🌀 **Async & sync** mapping support
-- 🧠 **Type-safe mapping configurations**
-- 🪄 **Deep clone and transformation utilities**
-- 🏗️ **Nested, array, and enum mapping**
-- 💉 **NestJS-friendly integration**
-- 🛠️ **Mapper helpers** (`mapFrom`, `ignore`, `transform`, etc.)
-- 🧰 **Validation rules** per property
-
----
-
-## 📦 Installation
+> **Status: 2.0 in development.** The engine is complete and tested; the
+> packages are not published yet. An independent community project, not
+> affiliated with NestJS or `@automapper`.
 
 ```bash
-npm install @custom-automapper
-# or
-yarn add @custom-automapper
+pnpm add @nestjs-automapper/nestjs @nestjs-automapper/typeorm
 ```
 
----
+| Package | What it is |
+|---|---|
+| [`@nestjs-automapper/core`](packages/core) | The engine. Zero dependencies. |
+| [`@nestjs-automapper/typeorm`](packages/typeorm) | TypeORM schema adapter |
+| [`@nestjs-automapper/nestjs`](packages/nestjs) | Module, DI, interceptor, pipe, CLI |
 
-## ⚙️ Basic Usage
-
-```ts
-import { Mapper, AutoMap } from '@custom-automapper';
-
-// DTOs
-class SourceDTO {
-  @AutoMap()
-  name: string;
-
-  @AutoMap()
-  age: number;
-}
-
-class TargetDTO {
-  @AutoMap()
-  name: string;
-
-  @AutoMap()
-  age: number;
-}
-
-// Mapper
-const mapper = new Mapper();
-mapper.createMap(SourceDTO, TargetDTO);
-
-const source = new SourceDTO();
-source.name = 'John';
-source.age = 30;
-
-const target = mapper.map(source, TargetDTO);
-
-console.log(target); // { name: 'John', age: 30 }
-```
-
----
-
-## 🧠 Advanced Usage
-
-### 1️⃣ Configuring Mapper in Constructor
-
-You can configure **global options** like caching, cloning, or naming conventions in the constructor:
+## The whole read path
 
 ```ts
-import { Mapper } from '@custom-automapper';
-
-const mapper = new Mapper({
-  globalOptions: {
-    deepClone: true,
-    skipUndefined: true,
-  },
-  cache: {
-    enabled: true,          // Enable caching globally
-    strategy: 'memory',     // 'memory' (default) or custom
-  }
-});
-```
-
-### 2️⃣ Enabling or Disabling Cache at Runtime
-
-```ts
-mapper.setCacheEnabled(true);
-console.log(mapper.isGlobalCacheEnabled()); // true
-
-mapper.setCacheEnabled(false);
-```
-
----
-
-## 🧩 Custom Mappings
-
-You can explicitly define property mappings using `mapFrom`:
-
-```ts
-mapper.createMap(SourceDTO, TargetDTO, {
-  name: mapper.mapFrom(src => src.name.toUpperCase()), // transform source value
-  age: mapper.mapFrom('age') // map directly by key
-});
-```
-
----
-
-## 🔁 Reverse Mapping
-
-Generate reverse mapping automatically:
-
-```ts
-mapper.createMap(SourceDTO, TargetDTO, {
-  name: src => src.name,
-  age: src => src.age,
+// app.module.ts
+AutomapperModule.forRoot({
+  adapters: [typeorm(dataSource)],
+  dtos: [ReadUserDto],
 });
 
-// Create reverse mapping (TargetDTO → SourceDTO)
-mapper.createReverseMap(SourceDTO, TargetDTO);
-```
+// user.dto.ts — no decorators, no transformer plugin
+export class ReadUserDto extends extend(Pick(User, ['id', 'email', 'createdAt']), {
+  fullName: compute(['firstName', 'lastName'], u => `${u.firstName} ${u.lastName}`),
+}) {}
 
----
-
-## ⚡ Async Mapping
-
-When mapping data that involves async transforms (e.g., fetching data or calling async functions):
-
-```ts
-await mapper.createMap(UserEntity, UserDTO, {
-  profileUrl: async src => await getProfileUrl(src.id)
-});
-
-const result = await mapper.mapAsync(userEntity, UserDTO);
-```
-
----
-
-## 🧱 Array Mapping
-
-```ts
-const users = [user1, user2, user3];
-const dtos = mapper.mapArray(users, UserDTO);
-
-// Or async version
-const dtosAsync = await mapper.mapArrayAsync(users, UserDTO);
-```
-
----
-
-## 🧩 Conditional Mapping
-
-Apply conditional mapping logic dynamically:
-
-```ts
-const target = mapper.mapConditional(source, TargetDTO, [
-  {
-    condition: src => src.age > 18,
-    map: src => ({ status: 'Adult' })
-  },
-  {
-    condition: src => src.age <= 18,
-    map: src => ({ status: 'Minor' })
-  }
-]);
-```
-
----
-
-## ✅ Validation Rules
-
-Attach validation rules per class property and validate mapped objects.
-
-```ts
-mapper.addValidation(UserDTO, 'email', {
-  validate: value => value.includes('@'),
-  message: 'Email must contain @ symbol'
-});
-
-await mapper.validate(new UserDTO()); // throws if invalid
-```
-
----
-
-## 🧠 Metadata Mapping with Decorators
-
-Decorators like `@AutoMap`, `@MapFrom`, and `@MapTo` automatically handle property mapping.
-
-```ts
-class AddressDTO {
-  @AutoMap()
-  city: string;
-}
-
-class UserDTO {
-  @AutoMap()
-  name: string;
-
-  @AutoMap(() => AddressDTO)
-  address: AddressDTO;
+// user.controller.ts
+@Get()
+@MapTo(ReadUserDto)
+findAll() {
+  return this.repo.find(this.mapper.nativeProjectionFor(ReadUserDto));
 }
 ```
 
----
+Twenty-column entity, five-field DTO, five-column `SELECT`.
 
-## 🪄 Map with Metadata Summary
+## What it does that `@automapper` does not
 
-Get detailed insights into which properties were mapped or skipped.
+**Projection push-down.** The DTO decides which columns are fetched. Declared
+dependencies mean a computed field projects its *sources*, not its own name.
 
-```ts
-const result = mapper.mapWithMetadata(source, TargetDTO);
+**Boot-time validation.** An unresolved field fails `nest start`, with the
+field, the source, the adapter, and a did-you-mean. `npx automapper check`
+gives the same guarantee in CI.
 
-console.log(result.metadata);
-/*
-{
-  mappedProperties: ['name', 'age'],
-  skippedProperties: [],
-  errors: [],
-  executionTime: 2
-}
-*/
+**Mass-assignment protection.** A `Write` DTO declaring `id` fails at boot; a
+request body carrying it gets a 400. Both derived from schema flags, not a
+hand-maintained list.
+
+**No transformer plugin.** `@automapper/classes` needs one, and it is a
+TypeScript compiler-API consumer. Nothing here requires a build plugin.
+
+**Reverse mapping.** Deleted from the incumbent because it had no schema to
+read. Database-owned fields come off the write side automatically —
+`select: false` columns deliberately do not, since that is `password`.
+
+**OpenAPI from the descriptor.** Computed fields have nowhere to hang
+`@ApiProperty`, so the schema is generated instead.
+
+**Type-level guarantees.** Mistyped dependency paths, unpicked fields, and
+synchronously mapping an async DTO are all compile errors.
+
+Full comparison, including what we deliberately refused and why:
+[`docs/ECOSYSTEM.md`](docs/ECOSYSTEM.md).
+
+## Documentation
+
+| | |
+|---|---|
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phase-by-phase status and parity matrix |
+| [`docs/ECOSYSTEM.md`](docs/ECOSYSTEM.md) | Coverage against every `@automapper` package |
+| `_bmad-output/specs/` | The capability contract (CAP-1…CAP-10) |
+| `_bmad-output/planning-artifacts/` | Architecture spine (AD-1…AD-20) and its reviews |
+
+## Development
+
+```bash
+pnpm install
+pnpm test
+pnpm verify        # typecheck on both TS lines, test, build, dependency invariants
 ```
 
----
+Requires Node ≥ 22.13 and pnpm 12.
 
-## 🔥 Cache Behavior
+Emit runs on the TypeScript 6.x line via the `@typescript/typescript6` alias;
+7.0 is the native port and ships no compiler API, which breaks `nest build`,
+the Swagger CLI plugin, and `ts-jest`. CI type-checks the published `.d.ts`
+under 7.x as well, because consumers will be there.
 
-Each mapped source object is cached by reference using a `WeakMap`, minimizing re-computation on repeated mapping calls.
+## About v1
 
-### Example:
-```ts
-mapper.setCacheEnabled(true);
+v1 shipped a decorator pipeline that never executed: metadata was written to
+`prototype + propertyKey` and read from the constructor, so the whole
+decorator-driven branch was dead code. It is preserved on the `v1-archive`
+branch. 2.0 is a rebuild and is not source-compatible.
 
-const src = new SourceDTO();
-src.name = 'Cached User';
-src.age = 25;
+## License
 
-const first = mapper.map(src, TargetDTO);
-const second = mapper.map(src, TargetDTO); // served from cache
-```
-
----
-
-## 🧹 Utility Methods
-
-| Method | Description |
-|--------|--------------|
-| `map()` | Maps an object synchronously |
-| `mapAsync()` | Maps asynchronously |
-| `mapArray()` | Maps an array synchronously |
-| `mapArrayAsync()` | Maps an array asynchronously |
-| `createReverseMap()` | Generates reverse mapping |
-| `clear()` | Clears registry and cache |
-| `getMappings()` | Lists registered mappings |
-| `mapWithMetadata()` | Maps with runtime metadata |
-
----
-
-## 🧱 Example: Full Flow
-
-```ts
-class UserEntity {
-  @AutoMap()
-  id: number;
-
-  @AutoMap()
-  fullName: string;
-
-  @AutoMap()
-  email: string;
-}
-
-class UserDTO {
-  @AutoMap()
-  id: number;
-
-  @AutoMap()
-  name: string;
-
-  @AutoMap()
-  email: string;
-}
-
-const mapper = new Mapper({ cache: { enabled: true } });
-
-mapper.createMap(UserEntity, UserDTO, {
-  name: src => src.fullName
-});
-
-const entity = { id: 1, fullName: 'Nishit Shiv', email: 'nishit@example.com' };
-
-const dto = mapper.map(entity, UserDTO);
-console.log(dto); // { id: 1, name: 'Nishit Shiv', email: 'nishit@example.com' }
-```
-
----
-
-## 📊 Comparison with `@automapper/core`
-
-| Feature | Custom AutoMapper | @automapper/core |
-|----------|------------------|------------------|
-| Decorator-driven mapping | ✅ | ✅ |
-| Nested object mapping | ✅ | ✅ |
-| Custom property mapping | ✅ | ✅ |
-| Async mapping | ✅ | ✅ |
-| Caching | ✅ | ❌ |
-| Validation | ✅ | ❌ |
-| DI integration | Manual | Built-in |
-
----
-
-## 🧩 Future Roadmap
-
-- Enhanced polymorphic mapping with type inference  
-- NestJS DI integration for singleton mappers  
-- Profiles for multi-context mapping  
-- Built-in transformations (`formatDate`, `uppercase`, etc.)
-
----
-
-## 🤝 Contributing
-
-Pull requests, discussions, and suggestions are welcome.  
-Open an issue or PR with a clear description of improvement.
-
----
-
-## 🪪 License
-
-**MIT License**  
-© 2025 Nishit Shiv
+MIT
