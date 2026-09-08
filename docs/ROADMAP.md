@@ -6,7 +6,7 @@ add that it does not have.
 **Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
 **Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
 
-Last updated: 2026-09-09 · branch `v2` · 131 tests passing · **all phases complete**
+Last updated: 2026-09-09 · branch `v2` · 149 tests passing · **all phases complete, all gaps closed**
 
 ---
 
@@ -231,7 +231,13 @@ Kept as a record of what earned its keep.
 
 ## 5. Known gaps
 
-- **A self-referencing DTO** needs its relation thunk annotated (`(): unknown => Dto`), or the class lands in its own base expression (TS2506). Runtime is unaffected.
-- **`describe()` has no live-DataSource test.** `toFindOptions` is pure and tested; `describe()` needs a real driver. Mocking TypeORM's metadata classes would only test the mock.
-- **Implicit primary key in projections.** Nothing yet adds the PK when a DTO omits it. TypeORM often needs it to hydrate relations.
-- **`@nestjs-automapper` npm org not created.** Package names verified free; the org needs `npm org create` under your account.
+All closed as of 2026-09-09 except the two that need your account:
+
+| Was | Status |
+|---|---|
+| No live-`DataSource` test for `describe()` | ✅ 15 tests against a real TypeORM `DataSource` on sql.js (WASM — no native build) |
+| No implicit primary key in projections | ✅ added in the adapter, not core: the neutral selection still reports only what the DTO consumes |
+| No `automapper check` CLI | ✅ boots the app context so CI seals the same pair set |
+| `forRootAsync` missing `useClass`/`useExisting` | ✅ both, via `AutomapperOptionsFactory` |
+| Self-referencing DTO TS2506 | ⚠️ inherent — annotate the thunk `(): unknown => Dto`. Runtime unaffected. |
+| npm org `@nestjs-automapper` | ⬜ needs `npm org create` under your account |

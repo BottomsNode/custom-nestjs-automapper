@@ -52,3 +52,28 @@ describe('neutral selection → TypeORM find options', () => {
     expect(toFindOptions({ fields: [], relations: {} })).toEqual({ select: {} });
   });
 });
+
+describe('primary keys the ORM requires', () => {
+  it('adds the primary key even when the DTO omits it', () => {
+    // Without it TypeORM cannot hydrate relations or dedupe rows. Core stays
+    // honest about what the DTO consumes; the adapter adds what the ORM needs.
+    expect(toFindOptions({ fields: ['email'], relations: {} }, ['id'])).toEqual({
+      select: { email: true, id: true },
+    });
+  });
+
+  it('does not duplicate a primary key the DTO already selected', () => {
+    expect(toFindOptions({ fields: ['id', 'email'], relations: {} }, ['id']).select).toEqual({
+      id: true,
+      email: true,
+    });
+  });
+
+  it('supports a composite key', () => {
+    expect(toFindOptions({ fields: ['label'], relations: {} }, ['tenantId', 'id']).select).toEqual({
+      label: true,
+      tenantId: true,
+      id: true,
+    });
+  });
+});

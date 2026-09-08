@@ -35,7 +35,8 @@
     "typeorm": "catalog:"
   },
   "devDependencies": {
-    "typeorm": "catalog:"
+    "typeorm": "catalog:",
+    "sql.js": "^1.13.0"
   },
   "publishConfig": {
     "access": "public"

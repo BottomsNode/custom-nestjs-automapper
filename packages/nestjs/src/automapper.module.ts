@@ -6,6 +6,7 @@ import {
   Module,
   OptionalFactoryDependency,
   Provider,
+  Type,
 } from '@nestjs/common';
 import { APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { Mapper, type ClassLike, type SchemaAdapter } from '@nestjs-automapper/core';
@@ -25,11 +26,20 @@ export interface AutomapperModuleOptions {
   name?: string;
 }
 
+/** Supplies options from DI. Implement on a provider for `useClass`/`useExisting`. */
+export interface AutomapperOptionsFactory {
+  createAutomapperOptions(): AutomapperModuleOptions | Promise<AutomapperModuleOptions>;
+}
+
 export interface AutomapperModuleAsyncOptions {
   name?: string;
   imports?: DynamicModule['imports'];
   inject?: Array<InjectionToken | OptionalFactoryDependency>;
-  useFactory: (...args: never[]) => AutomapperModuleOptions | Promise<AutomapperModuleOptions>;
+  useFactory?: (...args: never[]) => AutomapperModuleOptions | Promise<AutomapperModuleOptions>;
+  /** Instantiated by this module. */
+  useClass?: Type<AutomapperOptionsFactory>;
+  /** Already provided elsewhere; reused rather than instantiated again. */
+  useExisting?: Type<AutomapperOptionsFactory>;
 }
 
 const OPTIONS = Symbol.for('@nestjs-automapper/options');
@@ -66,7 +76,7 @@ export class AutomapperModule {
       module: AutomapperModule,
       imports: options.imports ?? [],
       providers: [
-        { provide: OPTIONS, useFactory: options.useFactory, inject: options.inject ?? [] },
+        ...optionsProviders(options),
         {
           provide: token,
           useFactory: (resolved: AutomapperModuleOptions) => build(resolved),
@@ -81,6 +91,29 @@ export class AutomapperModule {
       exports: [token],
     };
   }
+}
+
+/** One of useFactory / useClass / useExisting, resolved to the OPTIONS token. */
+function optionsProviders(options: AutomapperModuleAsyncOptions): Provider[] {
+  if (options.useFactory) {
+    return [{ provide: OPTIONS, useFactory: options.useFactory, inject: options.inject ?? [] }];
+  }
+
+  const factoryClass = options.useExisting ?? options.useClass;
+  if (!factoryClass) {
+    throw new Error('AutomapperModule.forRootAsync requires useFactory, useClass, or useExisting');
+  }
+
+  return [
+    // useExisting reuses a provider the app already registered; useClass is
+    // instantiated here, so only that case needs its own provider entry.
+    ...(options.useClass ? [{ provide: options.useClass, useClass: options.useClass }] : []),
+    {
+      provide: OPTIONS,
+      useFactory: (factory: AutomapperOptionsFactory) => factory.createAutomapperOptions(),
+      inject: [factoryClass],
+    },
+  ];
 }
 
 function build(options: AutomapperModuleOptions): Mapper {
