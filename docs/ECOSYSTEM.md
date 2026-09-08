@@ -1,71 +1,43 @@
 # The `@automapper/*` ecosystem — full coverage analysis
 
-Scope check against **every** published `@automapper` package, not just `core`.
-Surfaces read from the `nartc/mapper` source tree and the npm registry on
-2026-09-08.
+Scope check against the published `@automapper` packages. Surfaces read from
+the `nartc/mapper` source tree and the npm registry on 2026-09-08.
+
+**In scope: `core`, `classes`, `nestjs`.** The ORM-strategy packages
+(`pojos`, `mikro`, `sequelize`) and the abandoned `types` are out — we
+compete on the NestJS + TypeORM path, and each ORM strategy is a separate
+adapter that can follow later without changing anything here.
 
 | Package | Version | Published | Role |
 |---|---|---|---|
 | `@automapper/core` | 9.0.2 | 2026-07-16 | Engine: mappings, member functions, profiles |
 | `@automapper/classes` | 9.0.2 | 2026-07-16 | `@AutoMap` decorator, `classes()` strategy, ts transformer plugin |
 | `@automapper/nestjs` | 9.0.2 | 2026-07-16 | Module, DI, `AutomapperProfile`, `MapPipe`, `MapInterceptor` |
-| `@automapper/pojos` | 9.0.2 | 2026-07-16 | `PojosMetadataMap` — mapping plain objects with no classes |
-| `@automapper/mikro` | 9.0.2 | 2026-07-16 | MikroORM entity strategy |
-| `@automapper/sequelize` | 9.0.2 | 2026-07-16 | Sequelize model strategy |
-| `@automapper/types` | 6.3.1 | 2021-10-28 | Abandoned |
+| ~~`@automapper/pojos`~~ | 9.0.2 | 2026-07-16 | out of scope — plain-object metadata |
+| ~~`@automapper/mikro`~~ | 9.0.2 | 2026-07-16 | out of scope — MikroORM strategy |
+| ~~`@automapper/sequelize`~~ | 9.0.2 | 2026-07-16 | out of scope — Sequelize strategy |
+| ~~`@automapper/types`~~ | 6.3.1 | 2021-10-28 | abandoned since 2021 |
 
 ---
 
-## 1. The gap this analysis found
+## 1. Deferred: non-class sources
 
-**Our design cannot describe a source that is not a runtime class.**
+`Pick(User, [...])` needs `User` to exist at runtime. That holds for TypeORM
+entities. It does not hold for Prisma, whose models are generated TypeScript
+*types*, nor for Drizzle, Kysely, or plain interfaces.
 
-`Pick(User, ['id', 'email'])` needs `User` to exist at runtime. That holds for
-TypeORM and Mikro entities, which are classes. It does **not** hold for:
+`@automapper/pojos` solves this with a manual metadata map. With that package
+out of scope, the only remaining driver is the Prisma adapter — which is 2.1,
+after this release. So a `defineSchema()` token source is **deferred to
+whenever Prisma lands**, not built now.
 
-- **Prisma** — models are generated TypeScript *types*. There is no class.
-- **Kysely / Drizzle** — schemas are objects and inferred types.
-- Plain interfaces, GraphQL codegen output, JSON API payloads.
+The one cost of deferring: widening `SchemaAdapter` later is a breaking change
+for third-party adapter authors. There are none yet, so the cost is currently
+zero and paying it early would be scaffolding.
 
-`@automapper/pojos` exists for exactly this, via manual registration:
-
-```ts
-PojosMetadataMap.create<UserDto>('UserDto', { id: String, name: String });
-```
-
-Prisma is scheduled for 2.1 in our roadmap, and **as currently designed the
-Prisma adapter cannot be built** — `SchemaAdapter.supports(type: ClassLike)`
-and `describe(type: ClassLike)` both key on a constructor that does not exist.
-
-This is a foundation issue, not a feature gap. It changes the `SchemaAdapter`
-port, so it belongs before 2.1 rather than after.
-
-### Proposed fix — `defineSchema()`
-
-A token-keyed descriptor source, feeding the *same* pipeline:
-
-```ts
-export const PrismaUser = defineSchema('PrismaUser', {
-  id:        { type: 'string', isPrimary: true, isGenerated: true },
-  email:     { type: 'string' },
-  createdAt: { type: 'date', isCreateDate: true },
-});
-
-class ReadUserDto extends extend(Pick(PrismaUser, ['id', 'email']), { … }) {}
-```
-
-`defineSchema` returns a real runtime object usable as a type token, so
-`ClassLike` widens to `TypeToken = ClassLike | SchemaToken`.
-
-**Why this beats `PojosMetadataMap`:** their metadata map feeds mapping only.
-Ours feeds the one descriptor every back-end reads, so a POJO source still gets
-projection push-down, OpenAPI generation, reverse mapping, and boot-time
-validation. A Prisma user gets `select` push-down that `@automapper/pojos`
-structurally cannot offer.
-
-The Prisma adapter then generates these from DMMF instead of hand-writing them.
-
----
+When it is built, it should feed the same descriptor every back-end reads —
+so a Prisma source still gets projection push-down, OpenAPI, and reverse
+mapping. `PojosMetadataMap` feeds mapping only.
 
 ## 2. Per-package coverage
 
@@ -116,24 +88,15 @@ The package we compete with most directly, and where we are thinnest.
 `MapPipe` is the sharpest omission. We map responses out; we do not map
 requests in. That is half of what a mapper is for.
 
-### `@automapper/pojos`
+### Out of scope
 
-| Feature | Ours | Status |
-|---|---|---|
-| `PojosMetadataMap.create()` | — | ⬜ **blocking gap** — see §1 |
-
-### `@automapper/mikro` and `@automapper/sequelize`
-
-| Feature | Ours | Status |
-|---|---|---|
-| MikroORM entities | — | ⬜ post-2.2 |
-| Sequelize models | — | ⬜ post-2.2 |
-| `serializeEntity` (unwrap ORM proxies) | — | ⬜ **new gap** |
-
-Their existence validates the `SchemaAdapter` port: five strategies over one
-engine is the same shape we chose. `serializeEntity` is a warning though —
-lazy-loaded proxies and reference wrappers need unwrapping before a generated
-accessor touches them, and our emitted `s?.["x"]` would read a proxy field.
+`pojos`, `mikro`, and `sequelize` are strategy packages for sources we are not
+targeting in 2.0. Their existence still validates the `SchemaAdapter` port —
+five strategies over one engine is the shape we chose — and one detail is
+worth carrying forward regardless: `mikro`'s `serializeEntity` exists to
+unwrap lazy-loaded proxies and reference wrappers. Our emitted `s?.["x"]`
+would read a proxy field directly, so any adapter for a proxying ORM needs the
+same unwrap step.
 
 ---
 
@@ -156,16 +119,16 @@ Unchanged by this analysis, and still the reason to switch:
 
 ## 4. Revised plan
 
-Six items enter the roadmap. Ordered by whether they block something else.
+Four items enter the roadmap; two are deferred.
 
-| # | Item | Why now | Lands |
+| # | Item | Why | Lands |
 |---|---|---|---|
-| 1 | **`defineSchema()` + `TypeToken`** | Blocks the Prisma adapter and every non-class source. Changes the port, so it must precede 2.1. | **Phase 6a** |
-| 2 | **Write path — `mapInput` / `MapDtoPipe`** | Half the use case is missing. Pairs naturally with reverse mapping, which already computes the drop list. | **Phase 6** (with CAP-8) |
-| 3 | **`forRootAsync`** | Every real Nest app configures from `ConfigService`. Small. | **Phase 6a** |
-| 4 | **Named mappers** | Multi-tenant and multi-context apps. `getMapperToken(name)`. | Phase 9 |
-| 5 | **`isGetterOnly` / computed entity getters** | Real pattern our adapter cannot see. | Phase 9 |
-| 6 | **Proxy unwrapping in adapters** | Lazy relations would otherwise be read straight off a proxy. | With each ORM adapter |
+| 1 | **Write path — `mapInput` / `MapDtoPipe`** | `MapPipe` maps request bodies; we only map responses out. Half the use case. Reuses the reverse drop list. | **Phase 6** |
+| 2 | **`forRootAsync`** | Every real Nest app configures from `ConfigService`. | **Phase 6** |
+| 3 | **Named mappers** (`getMapperToken`) | Multi-tenant and multi-context apps. | Phase 9 |
+| 4 | **`isGetterOnly`** | A `get fullName()` on an entity is a real pattern our adapter cannot see. | Phase 9 |
+| — | `defineSchema()` / `TypeToken` | Deferred with Prisma — see §1. | 2.1 |
+| — | Proxy unwrapping | Deferred with the ORMs that need it. | post-2.0 |
 
 Deliberately **not** adopted: `dispose()` (no global mutable registry to
 release), and `globalNamingConventions` (AD-15 gives conversion exactly one

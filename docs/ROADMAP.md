@@ -20,8 +20,7 @@ Last updated: 2026-09-08 · branch `v2` · 97 tests passing
 | **3** | Codegen emitter | — | ✅ done |
 | **4** | Projector + TypeORM adapter | CAP-5 | ✅ done · CAP-6 pending |
 | **5** | `Mapper` facade, NestJS module, seal lifecycle | CAP-3 | ✅ done · CLI pending |
-| **6a** | `defineSchema()` + `TypeToken`, `forRootAsync` | — | ⬜ next |
-| **6** | Reverse mapping + write path (`MapDtoPipe`) | CAP-8 | ⬜ |
+| **6** | Reverse mapping + write path + `forRootAsync` | CAP-8 | ⬜ next |
 | **7** | `schemaOf` → OpenAPI | CAP-9 | ⬜ |
 | **8** | Nested/collection + identity map | CAP-6, CAP-7 | ⬜ |
 | **9** | Named mappers, getter-only fields | — | ⬜ |
@@ -88,16 +87,7 @@ service locator or an injectable-pipe dance, and
 `mapper.nativeProjectionFor(Dto)` already covers it from a service.
 `forFeature` waits for a real multi-module case.
 
-### Phase 6a — Non-class sources ⬜ next
-
-`defineSchema()` returning a runtime token, widening `ClassLike` to
-`TypeToken`. Blocking: Prisma models are TypeScript types with no runtime
-class, so the 2.1 Prisma adapter cannot be built against the current port.
-Also `forRootAsync` for `ConfigService`-driven setup.
-
-See `ECOSYSTEM.md` §1.
-
-### Phase 6 — Reverse mapping + write path ⬜
+### Phase 6 — Reverse mapping + write path ⬜ next
 
 `reverse()` deriving a write DTO, dropping fields the write policy owns —
 primary keys, generated columns, create/update/delete timestamps, version,
