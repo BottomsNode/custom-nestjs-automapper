@@ -1,15 +1,8 @@
 /**
- * TypeORM schema adapter — Phase 4.
+ * TypeORM schema adapter for @nestjs-automapper.
  *
- * Verified available on typeorm@1.1.1 and required by CAP-5 / CAP-8:
- *   DataSource.getMetadata
- *   ColumnMetadata   isPrimary · isGenerated · isCreateDate · isUpdateDate
- *                    isDeleteDate · isVersion · isDiscriminator · isSelect
- *                    · isNullable · databaseName · propertyName
- *   RelationMetadata joinColumns · inverseJoinColumns · relationType
- *                    · inverseEntityMetadata · isNullable
- *
- * AD-14: describe() returns everything the schema declares and applies NO
- * policy. Filtering belongs to the planner alone.
+ * AD-6: this package imports `core` and nothing else from the workspace.
+ * `typeorm` is a peer dependency — the app owns the ORM version.
  */
-export const ADAPTER_NAME = 'typeorm';
+export { typeorm, toFindOptions, ADAPTER_NAME } from './typeorm.adapter.js';
+export type { TypeOrmProjection } from './typeorm.adapter.js';

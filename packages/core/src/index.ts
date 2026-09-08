@@ -51,3 +51,7 @@ export { buildPlan, planKey } from './plan/planner.js';
 // --- codegen back-end (AD-3) ---
 export type { CompiledPlan } from './emit/codegen.js';
 export { compile } from './emit/codegen.js';
+
+// --- projection back-end (AD-10) ---
+export { projectionFor, mergeSelection, EMPTY_SELECTION } from './project/projector.js';
+export type { ProjectOptions } from './project/projector.js';
