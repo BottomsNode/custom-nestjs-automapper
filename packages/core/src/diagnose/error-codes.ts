@@ -40,6 +40,13 @@ export interface ErrorPayloads {
   /** A write DTO declared a field the write policy drops (AD-14 — a rejection, not a silent exclusion). */
   WRITE_FIELD_REJECTED: Common & { readonly field: string; readonly reason: string };
 
+  /** A request body carried fields the write DTO does not accept. */
+  INPUT_FIELDS_REJECTED: Common & {
+    readonly destType: ClassLike;
+    readonly rejected: readonly string[];
+    readonly accepted: readonly string[];
+  };
+
   /** A cycle exists and the back-edge field is not optional (AD-7). */
   CYCLE_REQUIRED_FIELD: Common & { readonly field: string; readonly cycle: readonly string[] };
 
@@ -66,6 +73,7 @@ export const ERROR_HEADLINE: { readonly [K in ErrorCode]: string } = {
   PATH_UNADDRESSABLE: 'source path cannot be addressed',
   MAPPING_NOT_FOUND: 'no mapping registered for this pair',
   WRITE_FIELD_REJECTED: 'write DTO declares a database-owned field',
+  INPUT_FIELDS_REJECTED: 'request body carried fields that are not accepted',
   CYCLE_REQUIRED_FIELD: 'cycle reaches a required field',
   CONTEXT_REQUIRED: 'projection requires context',
   REGISTRY_SEALED: 'registry is sealed',

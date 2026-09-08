@@ -15,11 +15,14 @@ export const FIELDS: unique symbol = Symbol.for('@nestjs-automapper/fields');
 export const RESOLVERS: unique symbol = Symbol.for('@nestjs-automapper/resolvers');
 /** The class this DTO derives from — the source it is declared against (AD-16). */
 export const SOURCE: unique symbol = Symbol.for('@nestjs-automapper/source');
+/** Write-direction marker. The planner enforces the drop list on these. */
+export const WRITE: unique symbol = Symbol.for('@nestjs-automapper/write');
 
 export interface DtoStatics {
   readonly [FIELDS]: readonly string[];
   readonly [RESOLVERS]: Readonly<Record<string, AnyResolver>>;
   readonly [SOURCE]: ClassLike | undefined;
+  readonly [WRITE]?: true;
 }
 
 /** A DTO class: constructible, plus the runtime registry the planner reads. */
@@ -56,6 +59,25 @@ export function Pick<T, const K extends readonly (keyof T & string)[]>(
 
   Object.defineProperty(Picked, 'name', { value: `Pick(${Base.name})` });
   return attach(Picked as Instantiable<Pick<T, K[number]>>, declared, {}, Base);
+}
+
+/**
+ * A DTO for the write path: same shape as `Pick`, but the planner rejects any
+ * field the database owns (AD-14) instead of silently dropping it, so a
+ * `CreateUserDto` carrying `id` fails at boot rather than at runtime.
+ */
+export function Write<T, const K extends readonly (keyof T & string)[]>(
+  Base: ClassLike<T>,
+  keys: K,
+): DtoClass<Pick<T, K[number]>> {
+  const dto = Pick(Base, keys);
+  Object.defineProperty(dto, WRITE, { value: true, enumerable: false });
+  return dto;
+}
+
+/** True for DTOs built with `Write`. */
+export function isWriteDto(type: unknown): boolean {
+  return (type as Partial<DtoStatics>)?.[WRITE] === true;
 }
 
 type ResolvedShape<R> = {
@@ -106,6 +128,7 @@ export function extend<
   }
 
   Object.defineProperty(Extended, 'name', { value: Base.name });
+  if (isWriteDto(Base)) Object.defineProperty(Extended, WRITE, { value: true, enumerable: false });
 
   return attach(
     Extended as unknown as Instantiable<InstanceType<TBase> & ResolvedShape<R>>,

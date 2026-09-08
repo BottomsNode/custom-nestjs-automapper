@@ -1,9 +1,19 @@
-import { DynamicModule, Global, Logger, Module, OnModuleInit, Provider } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import {
+  DynamicModule,
+  Global,
+  InjectionToken,
+  Logger,
+  Module,
+  OnModuleInit,
+  OptionalFactoryDependency,
+  Provider,
+} from '@nestjs/common';
+import { APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { Mapper, type ClassLike, type SchemaAdapter } from '@nestjs-automapper/core';
 import { MAPPER } from './automapper.constants.js';
 import { InjectMapper } from './automapper.decorators.js';
 import { MapToInterceptor } from './map-to.interceptor.js';
+import { MapBodyPipe } from './map-body.pipe.js';
 
 export interface AutomapperModuleOptions {
   adapters: SchemaAdapter[];
@@ -11,6 +21,33 @@ export interface AutomapperModuleOptions {
   dtos?: ClassLike[];
   /** Register MapToInterceptor globally. Default true. */
   interceptor?: boolean;
+  /** Register MapBodyPipe globally. Default true. */
+  bodyPipe?: boolean;
+}
+
+export interface AutomapperModuleAsyncOptions {
+  imports?: DynamicModule['imports'];
+  inject?: Array<InjectionToken | OptionalFactoryDependency>;
+  useFactory: (...args: never[]) => AutomapperModuleOptions | Promise<AutomapperModuleOptions>;
+}
+
+const OPTIONS = Symbol.for('@nestjs-automapper/options');
+
+function build(options: AutomapperModuleOptions): Mapper {
+  const mapper = new Mapper();
+  for (const adapter of options.adapters) mapper.use(adapter);
+  return mapper.register(...(options.dtos ?? []));
+}
+
+function globals(options: AutomapperModuleOptions): Provider[] {
+  const providers: Provider[] = [];
+  if (options.interceptor !== false) {
+    providers.push({ provide: APP_INTERCEPTOR, useClass: MapToInterceptor });
+  }
+  if (options.bodyPipe !== false) {
+    providers.push({ provide: APP_PIPE, useClass: MapBodyPipe });
+  }
+  return providers;
 }
 
 /**
@@ -26,22 +63,35 @@ export class AutomapperModule implements OnModuleInit {
   constructor(@InjectMapper() private readonly mapper: Mapper) {}
 
   static forRoot(options: AutomapperModuleOptions): DynamicModule {
-    const providers: Provider[] = [
-      {
-        provide: MAPPER,
-        useFactory: (): Mapper => {
-          const mapper = new Mapper();
-          for (const adapter of options.adapters) mapper.use(adapter);
-          return mapper.register(...(options.dtos ?? []));
+    return {
+      module: AutomapperModule,
+      providers: [
+        { provide: MAPPER, useFactory: () => build(options) },
+        ...globals(options),
+      ],
+      exports: [MAPPER],
+    };
+  }
+
+  /** Same, with options resolved from DI — typically ConfigService. */
+  static forRootAsync(async: AutomapperModuleAsyncOptions): DynamicModule {
+    return {
+      module: AutomapperModule,
+      imports: async.imports ?? [],
+      providers: [
+        { provide: OPTIONS, useFactory: async.useFactory, inject: async.inject ?? [] },
+        {
+          provide: MAPPER,
+          useFactory: (options: AutomapperModuleOptions) => build(options),
+          inject: [OPTIONS],
         },
-      },
-    ];
-
-    if (options.interceptor !== false) {
-      providers.push({ provide: APP_INTERCEPTOR, useClass: MapToInterceptor });
-    }
-
-    return { module: AutomapperModule, providers, exports: [MAPPER] };
+        // Registered unconditionally: the flags live in options, which are not
+        // known until the factory runs, and both no-op when unused.
+        { provide: APP_INTERCEPTOR, useClass: MapToInterceptor },
+        { provide: APP_PIPE, useClass: MapBodyPipe },
+      ],
+      exports: [MAPPER],
+    };
   }
 
   onModuleInit(): void {

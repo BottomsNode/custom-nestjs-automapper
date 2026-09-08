@@ -76,17 +76,20 @@ The package we compete with most directly, and where we are thinnest.
 | Feature | Ours | Status |
 |---|---|---|
 | `AutomapperModule.forRoot` | ✅ | ✅ |
-| **`forRootAsync`** (`useFactory`, `inject`, `useClass`) | — | ⬜ **new gap** — standard for `ConfigService` |
+| **`forRootAsync`** (`useFactory`, `inject`) | ✅ | ✅ · `useClass`/`useExisting` pending |
 | `@InjectMapper()` | ✅ | ✅ |
 | `getMapperToken(name)` — **named mappers** | single mapper | ⬜ **new gap** |
 | `AutomapperProfile` injectable class | `forRoot({ dtos })` | ⚠️ flat list only |
 | `MapInterceptor` (response) | `@MapTo` + `MapToInterceptor` | ✅ |
-| **`MapPipe`** (request body → entity) | — | ⬜ **new gap** — the entire write path |
+| **`MapPipe`** (request body → entity) | `MapBodyPipe` + `mapInput` | ✅ stricter — see below |
 | `globalErrorHandler` | — | ⬜ |
 | `globalNamingConventions` | adapter-owned (AD-15) | ⚠️ different design |
 
-`MapPipe` is the sharpest omission. We map responses out; we do not map
-requests in. That is half of what a mapper is for.
+`MapPipe` was the sharpest omission and is now closed. `MapBodyPipe` reads
+`metadata.metatype`, so plain `@Body() dto: CreateUserDto` works with no
+factory call at the parameter — and it **rejects** unknown or database-owned
+keys rather than mapping whatever it is handed. That is mass-assignment
+protection derived from the schema, which `MapPipe` has no way to compute.
 
 ### Out of scope
 
@@ -123,8 +126,8 @@ Four items enter the roadmap; two are deferred.
 
 | # | Item | Why | Lands |
 |---|---|---|---|
-| 1 | **Write path — `mapInput` / `MapDtoPipe`** | `MapPipe` maps request bodies; we only map responses out. Half the use case. Reuses the reverse drop list. | **Phase 6** |
-| 2 | **`forRootAsync`** | Every real Nest app configures from `ConfigService`. | **Phase 6** |
+| 1 | ~~Write path~~ | Done — `Write()`, `mapInput`, `MapBodyPipe`. | ✅ Phase 6 |
+| 2 | ~~`forRootAsync`~~ | Done (`useFactory` + `inject`). | ✅ Phase 6 |
 | 3 | **Named mappers** (`getMapperToken`) | Multi-tenant and multi-context apps. | Phase 9 |
 | 4 | **`isGetterOnly`** | A `get fullName()` on an entity is a real pattern our adapter cannot see. | Phase 9 |
 | — | `defineSchema()` / `TypeToken` | Deferred with Prisma — see §1. | 2.1 |

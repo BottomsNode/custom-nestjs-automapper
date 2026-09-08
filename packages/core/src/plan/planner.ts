@@ -10,8 +10,9 @@ import type { AdapterRegistry } from '../descriptor/registry.js';
 import type { ClassLike, FieldMeta, RelationMeta, TypeDescriptor } from '../descriptor/types.js';
 import { AutomapperError, fail } from '../diagnose/automapper-error.js';
 import type { PathSegment } from '../dto/path.js';
-import { FIELDS, RESOLVERS, SOURCE, isDtoClass } from '../dto/pick.js';
+import { FIELDS, RESOLVERS, SOURCE, isDtoClass, isWriteDto } from '../dto/pick.js';
 import type { AnyResolver } from '../dto/resolver.js';
+import { writeDropReason } from '../policy.js';
 import {
   children,
   isNodeAsync,
@@ -62,8 +63,28 @@ export function buildPlan(
 
   const diagnostics: AutomapperError[] = [];
   const nodes: ResolutionNode[] = [];
+  const isWrite = isWriteDto(dest);
 
   for (const field of dto[FIELDS]) {
+    // AD-14: a database-owned field on a write DTO is a rejection, not a
+    // silent exclusion — otherwise nothing tells the developer it was ignored.
+    const meta = byName.get(field);
+    if (isWrite && meta) {
+      const reason = writeDropReason(meta);
+      if (reason) {
+        diagnostics.push(
+          fail('WRITE_FIELD_REJECTED', {
+            destType: dest,
+            sourceType: source,
+            field,
+            reason,
+            adapter: sourceDesc.producedBy,
+          }),
+        );
+        continue;
+      }
+    }
+
     const resolver = dto[RESOLVERS][field];
     const node = resolver
       ? lowerResolver(field, resolver, sourceDesc, registry, dest, diagnostics)

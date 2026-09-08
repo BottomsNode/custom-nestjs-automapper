@@ -6,7 +6,7 @@ add that it does not have.
 **Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
 **Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
 
-Last updated: 2026-09-08 · branch `v2` · 97 tests passing
+Last updated: 2026-09-09 · branch `v2` · 109 tests passing
 
 ---
 
@@ -20,8 +20,8 @@ Last updated: 2026-09-08 · branch `v2` · 97 tests passing
 | **3** | Codegen emitter | — | ✅ done |
 | **4** | Projector + TypeORM adapter | CAP-5 | ✅ done · CAP-6 pending |
 | **5** | `Mapper` facade, NestJS module, seal lifecycle | CAP-3 | ✅ done · CLI pending |
-| **6** | Reverse mapping + write path + `forRootAsync` | CAP-8 | ⬜ next |
-| **7** | `schemaOf` → OpenAPI | CAP-9 | ⬜ |
+| **6** | Write path, drop-list policy, `forRootAsync` | CAP-8 | ✅ done · reverse() pending |
+| **7** | `schemaOf` → OpenAPI | CAP-9 | ⬜ next |
 | **8** | Nested/collection + identity map | CAP-6, CAP-7 | ⬜ |
 | **9** | Named mappers, getter-only fields | — | ⬜ |
 
@@ -87,7 +87,7 @@ service locator or an injectable-pipe dance, and
 `mapper.nativeProjectionFor(Dto)` already covers it from a service.
 `forFeature` waits for a real multi-module case.
 
-### Phase 6 — Reverse mapping + write path ⬜ next
+### Phase 6 — Write path ✅
 
 `reverse()` deriving a write DTO, dropping fields the write policy owns —
 primary keys, generated columns, create/update/delete timestamps, version,
@@ -95,9 +95,16 @@ discriminator (AD-14). `isSelectByDefault === false` is explicitly *not* a
 drop reason; that is the `password` case. Relation → foreign-key reversal
 stays SHOULD-tier.
 
-Ships the write path in the same phase, since it reuses the drop list:
-`MapDtoPipe(CreateUserDto)` maps a request body **and rejects fields the
-database owns**. `@automapper/nestjs`'s `MapPipe` maps whatever it is given.
+`Write(User, [...])` marks a write DTO; the planner rejects a
+database-owned field at seal (AD-14) rather than dropping it silently.
+`Mapper.mapInput` maps an untrusted body and **rejects unknown or
+database-owned keys** — mass-assignment protection derived from the schema.
+`MapBodyPipe` applies it globally, reading `metadata.metatype` so ordinary
+`@Body() dto: CreateUserDto` works with no factory call and full DI.
+`forRootAsync` lands here too.
+
+Still pending: `reverse(ReadDto)` deriving a write DTO automatically. The
+policy and enforcement exist; only the derivation helper is missing.
 
 ### Phase 7 — OpenAPI ⬜
 

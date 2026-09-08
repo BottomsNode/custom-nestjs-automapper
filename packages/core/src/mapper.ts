@@ -1,6 +1,7 @@
 import { AdapterRegistry } from './descriptor/registry.js';
 import type { ClassLike, FieldSelection, SchemaAdapter } from './descriptor/types.js';
 import { AutomapperError, fail } from './diagnose/automapper-error.js';
+import { isWriteDto } from './dto/pick.js';
 import { compile, type CompiledPlan } from './emit/codegen.js';
 import { buildPlan, type MappingPlan } from './plan/planner.js';
 import { projectionFor, type ProjectOptions } from './project/projector.js';
@@ -67,6 +68,31 @@ export class Mapper<Ctx = unknown> {
     const plan = this.planFor(dto, 'map');
     if (plan.isAsync) throw fail('REGISTRY_UNSEALED', { destType: dto, operation: 'map (async plan — use mapAsync)' });
     return this.compiledFor(dto).invoke(source, options.ctx) as D;
+  }
+
+  /**
+   * Maps an untrusted request body, rejecting any key the DTO does not accept.
+   *
+   * `map` trusts its source; this does not. Silently ignoring extra keys is
+   * how mass assignment gets through, so unknown and database-owned fields are
+   * an error rather than a no-op.
+   */
+  mapInput<D>(body: unknown, dto: ClassLike<D>, options: MapOptions<Ctx> = {}): D {
+    const plan = this.planFor(dto, 'mapInput');
+    if (!isWriteDto(dto)) {
+      throw fail('DEST_NOT_RUNTIME_CLASS', { destType: dto });
+    }
+
+    const accepted = plan.nodes.map((n) => n.field);
+    const rejected =
+      body && typeof body === 'object'
+        ? Object.keys(body as object).filter((k) => !accepted.includes(k))
+        : [];
+
+    if (rejected.length > 0) {
+      throw fail('INPUT_FIELDS_REJECTED', { destType: dto, rejected, accepted });
+    }
+    return this.map(body, dto, options);
   }
 
   mapArray<D>(source: readonly unknown[], dto: ClassLike<D>, options: MapOptions<Ctx> = {}): D[] {
