@@ -1,9 +1,9 @@
 import { Inject, SetMetadata } from '@nestjs/common';
 import type { ClassLike } from '@nestjs-automapper/core';
-import { MAPPER, MAP_TO } from './automapper.constants.js';
+import { MAP_TO, getMapperToken } from './automapper.constants.js';
 
-/** Injects the shared Mapper. */
-export const InjectMapper = (): ParameterDecorator => Inject(MAPPER);
+/** Injects a Mapper — the default one, or the mapper registered under `name`. */
+export const InjectMapper = (name?: string): ParameterDecorator => Inject(getMapperToken(name));
 
 /** Maps a handler's return value to `dto`. Applied by MapToInterceptor. */
 export const MapTo = (dto: ClassLike) => SetMetadata(MAP_TO, dto);
