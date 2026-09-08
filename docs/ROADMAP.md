@@ -20,9 +20,11 @@ Last updated: 2026-09-08 · branch `v2` · 97 tests passing
 | **3** | Codegen emitter | — | ✅ done |
 | **4** | Projector + TypeORM adapter | CAP-5 | ✅ done · CAP-6 pending |
 | **5** | `Mapper` facade, NestJS module, seal lifecycle | CAP-3 | ✅ done · CLI pending |
-| **6** | Reverse mapping (scalars) | CAP-8 | ⬜ next |
+| **6a** | `defineSchema()` + `TypeToken`, `forRootAsync` | — | ⬜ next |
+| **6** | Reverse mapping + write path (`MapDtoPipe`) | CAP-8 | ⬜ |
 | **7** | `schemaOf` → OpenAPI | CAP-9 | ⬜ |
 | **8** | Nested/collection + identity map | CAP-6, CAP-7 | ⬜ |
+| **9** | Named mappers, getter-only fields | — | ⬜ |
 
 ### Phase 0 — Workspace ✅
 
@@ -86,13 +88,26 @@ service locator or an injectable-pipe dance, and
 `mapper.nativeProjectionFor(Dto)` already covers it from a service.
 `forFeature` waits for a real multi-module case.
 
-### Phase 6 — Reverse mapping ⬜
+### Phase 6a — Non-class sources ⬜ next
+
+`defineSchema()` returning a runtime token, widening `ClassLike` to
+`TypeToken`. Blocking: Prisma models are TypeScript types with no runtime
+class, so the 2.1 Prisma adapter cannot be built against the current port.
+Also `forRootAsync` for `ConfigService`-driven setup.
+
+See `ECOSYSTEM.md` §1.
+
+### Phase 6 — Reverse mapping + write path ⬜
 
 `reverse()` deriving a write DTO, dropping fields the write policy owns —
 primary keys, generated columns, create/update/delete timestamps, version,
 discriminator (AD-14). `isSelectByDefault === false` is explicitly *not* a
 drop reason; that is the `password` case. Relation → foreign-key reversal
 stays SHOULD-tier.
+
+Ships the write path in the same phase, since it reuses the drop list:
+`MapDtoPipe(CreateUserDto)` maps a request body **and rejects fields the
+database owns**. `@automapper/nestjs`'s `MapPipe` maps whatever it is given.
 
 ### Phase 7 — OpenAPI ⬜
 
@@ -108,6 +123,9 @@ resolver memoisation (AD-7). Deliberately last — every piece of it is
 unreachable until nested nodes have a producer.
 
 ---
+
+> Full ecosystem coverage — all six `@automapper/*` packages, not just
+> `core` — is in **`ECOSYSTEM.md`**, along with the gaps it surfaced.
 
 ## 2. Parity with `@automapper/core`
 
