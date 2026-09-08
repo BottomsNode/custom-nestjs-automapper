@@ -28,7 +28,9 @@ if (!entry) {
 }
 
 try {
-  execFileSync(process.execPath, [entry, '-p', 'tsconfig.json', '--noEmit'], { cwd, stdio: 'pipe' });
+  // tsconfig.build.json, not tsconfig.json: it excludes tests, which are
+  // local-only and not part of what consumers compile against.
+  execFileSync(process.execPath, [entry, '-p', 'tsconfig.build.json', '--noEmit'], { cwd, stdio: 'pipe' });
   console.log('  ts7 typecheck ok');
 } catch (err) {
   const out = (err.stdout?.toString() ?? '') + (err.stderr?.toString() ?? '');

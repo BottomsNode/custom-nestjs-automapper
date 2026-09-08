@@ -28,7 +28,7 @@
   ],
   "scripts": {
     "build": "node ../../scripts/build-package.mjs",
-    "typecheck": "node ../../scripts/tsc6.mjs -p tsconfig.json --noEmit",
+    "typecheck": "node ../../scripts/tsc6.mjs -p tsconfig.build.json --noEmit",
     "typecheck:ts7": "node ../../scripts/typecheck-ts7.mjs"
   },
   "dependencies": {
@@ -44,8 +44,7 @@
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "@nestjs/testing": "catalog:"
+    "rxjs": "catalog:"
   },
   "publishConfig": {
     "access": "public"
