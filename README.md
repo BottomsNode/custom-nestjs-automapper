@@ -87,9 +87,10 @@ Full comparison, including what we deliberately refused and why:
 
 ```bash
 pnpm install
-pnpm test
-pnpm verify        # typecheck on both TS lines, test, build, dependency invariants
+pnpm verify        # typecheck on both TS lines, build, dependency invariants
 ```
+
+Tests are kept local and are not committed — see [`TESTING.md`](TESTING.md).
 
 Requires Node ≥ 22.13 and pnpm 12.
 

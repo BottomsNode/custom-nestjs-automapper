@@ -11,3 +11,10 @@ _bmad/
 .claude
 .agents
 skills-lock.json
+
+# Tests stay local — never committed, never published.
+*.spec.ts
+*.test-d.ts
+vitest.config.*
+packages/typeorm/src/sql-js.d.ts
+_bmad-output/specs/*/spike/

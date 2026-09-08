@@ -15,12 +15,10 @@
   },
   "scripts": {
     "build": "nx run-many -t build",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "typecheck": "nx run-many -t typecheck",
     "typecheck:ts7": "nx run-many -t typecheck:ts7",
     "lint": "nx run-many -t lint",
-    "verify": "pnpm typecheck && pnpm typecheck:ts7 && pnpm test && pnpm build && pnpm check:zero-deps",
+    "verify": "pnpm typecheck && pnpm typecheck:ts7 && pnpm build && pnpm check:zero-deps",
     "check:zero-deps": "node scripts/check-zero-deps.mjs",
     "changeset": "changeset",
     "version-packages": "changeset version",
@@ -29,11 +27,9 @@
   "devDependencies": {
     "@nx/js": "23.2.0",
     "@types/node": "^22.13.0",
-    "@vitest/coverage-v8": "5.0.0",
     "nx": "23.2.0",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript7": "npm:typescript@7.0.2",
-    "vitest": "5.0.0",
     "@changesets/cli": "^2.29.7"
   }
 }

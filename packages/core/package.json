@@ -1,7 +1,7 @@
 {
   "name": "@nestjs-automapper/core",
   "version": "2.0.0-alpha.0",
-  "description": "Schema-aware object mapping for TypeScript \u2014 zero dependencies",
+  "description": "Schema-aware object mapping for TypeScript — zero dependencies",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -25,7 +25,7 @@
   ],
   "scripts": {
     "build": "node ../../scripts/build-package.mjs",
-    "typecheck": "node ../../scripts/tsc6.mjs -p tsconfig.json --noEmit",
+    "typecheck": "node ../../scripts/tsc6.mjs -p tsconfig.build.json --noEmit",
     "typecheck:ts7": "node ../../scripts/typecheck-ts7.mjs"
   },
   "publishConfig": {

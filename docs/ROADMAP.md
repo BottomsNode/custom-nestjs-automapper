@@ -3,10 +3,14 @@
 Phase-by-phase status, plus what we cover from `@automapper/core` and what we
 add that it does not have.
 
+> **Tests are not in this repository.** They are kept locally and are neither
+> committed nor published — see `TESTING.md`. Test counts quoted below are
+> historical, recorded at the time each phase was verified.
+
 **Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
 **Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
 
-Last updated: 2026-09-09 · branch `v2` · 166 tests passing · **complete; only the npm org remains**
+Last updated: 2026-09-09 · branch `v2` · **complete; only the npm org remains**
 
 ---
 
@@ -271,6 +275,7 @@ All closed as of 2026-09-09 except the two that need your account:
 | | |
 |---|---|
 | Package manifests, `exports` maps, dual ESM/CJS | ✅ |
+| Tests excluded from git and from the published tarball | ✅ — see `TESTING.md` |
 | READMEs, LICENSE, `files` fields | ✅ |
 | CI running the full gate | ✅ |
 | npm org created | ⬜ **blocks publish** — `npm org create nestjs-automapper` |

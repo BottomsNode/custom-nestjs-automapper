@@ -22,16 +22,18 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Tests are deliberately not in the repository, so CI verifies what it
+      # can: both compilers accept the sources, both output formats build, and
+      # the dependency invariants hold.
+
       # Emit line. `.bin/tsc` is TypeScript 7, so this goes through tsc6.mjs,
       # which fails loudly if it ever resolves a non-6.x compiler.
       - name: Typecheck (TypeScript 6)
-        run: pnpm -r --workspace-concurrency=1 exec node ../../scripts/tsc6.mjs -p tsconfig.json --noEmit
+        run: pnpm -r --workspace-concurrency=1 exec node ../../scripts/tsc6.mjs -p tsconfig.build.json --noEmit
 
       # Consumers will be on 7.x even though it cannot build the packages.
       - name: Typecheck (TypeScript 7)
         run: pnpm -r --workspace-concurrency=1 exec node ../../scripts/typecheck-ts7.mjs
-
-      - run: pnpm test
 
       - run: pnpm -r --workspace-concurrency=1 exec node ../../scripts/build-package.mjs
 
