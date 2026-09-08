@@ -89,6 +89,14 @@ function render<C extends ErrorCode>(code: C, payload: ErrorPayloads[C]): string
       break;
     }
 
+    case 'INPUT_FIELDS_REJECTED': {
+      const q = p as ErrorPayloads['INPUT_FIELDS_REJECTED'];
+      lines.push(`  ${nameOf(q.destType)} does not accept: ${q.rejected.join(', ')}`);
+      lines.push(`  accepted: ${q.accepted.join(', ')}`);
+      lines.push('', '  remove them from the request — the server owns these values.');
+      break;
+    }
+
     case 'CYCLE_REQUIRED_FIELD': {
       const q = p as ErrorPayloads['CYCLE_REQUIRED_FIELD'];
       lines.push(`  cycle: ${q.cycle.join(' → ')}`);

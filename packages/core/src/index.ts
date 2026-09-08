@@ -18,7 +18,7 @@ export type { Resolver, ResolverKind, AnyResolver } from './dto/resolver.js';
 export { auto, from, compute, resolve, constant, ignore, visible } from './dto/resolver.js';
 
 export type { DtoClass, DtoStatics, AsyncBrand } from './dto/pick.js';
-export { Pick, extend, isDtoClass, FIELDS, RESOLVERS, SOURCE } from './dto/pick.js';
+export { Pick, Write, extend, isDtoClass, isWriteDto, FIELDS, RESOLVERS, SOURCE, WRITE } from './dto/pick.js';
 
 // --- descriptors & adapter arbitration (AD-17) ---
 export { AdapterRegistry, dtoAdapter } from './descriptor/registry.js';
@@ -59,3 +59,6 @@ export type { ProjectOptions } from './project/projector.js';
 // --- facade ---
 export { Mapper } from './mapper.js';
 export type { PlanReport, MapOptions } from './mapper.js';
+
+// --- direction policy (AD-14) ---
+export { writeDropReason, writableFields, isHiddenOnRead } from './policy.js';
