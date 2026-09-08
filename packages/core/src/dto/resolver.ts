@@ -6,7 +6,16 @@
 
 import type { Path } from './path.js';
 
-export type ResolverKind = 'auto' | 'from' | 'compute' | 'resolve' | 'constant' | 'ignore' | 'gated';
+export type ResolverKind =
+  | 'auto'
+  | 'from'
+  | 'compute'
+  | 'resolve'
+  | 'constant'
+  | 'ignore'
+  | 'gated'
+  | 'nested'
+  | 'collection';
 
 /**
  * `Out` is the mapped field's type. `Async` brands the resolver, and the brand
@@ -22,6 +31,8 @@ export interface Resolver<Src, Out, Async extends boolean = false> {
   readonly child?: Resolver<Src, unknown, boolean>;
   readonly predicate?: (ctx: unknown) => boolean;
   readonly constant?: unknown;
+  /** Destination DTO for a relation. Lazy, so circular DTO imports resolve. */
+  readonly target?: () => unknown;
   /** Phantom carriers. Never read at runtime. */
   readonly __out?: Out;
   readonly __async?: Async;
@@ -92,6 +103,35 @@ export function visible<Src, Out, Async extends boolean>(
     child: inner as Resolver<Src, unknown, boolean>,
     predicate: predicate as (ctx: unknown) => boolean,
   } as Resolver<Src, Out | undefined, Async>;
+}
+
+/**
+ * A to-one relation, mapped by the given DTO. The source path defaults to the
+ * destination field name; pass `path` when they differ.
+ */
+export function nested<Src, Out>(
+  target: () => unknown,
+  path?: Path<Src>,
+): Resolver<Src, Out | undefined, false> {
+  return {
+    kind: 'nested',
+    deps: path ? [path] : [],
+    fn: () => undefined,
+    target,
+  } as Resolver<Src, Out | undefined, false>;
+}
+
+/** A to-many relation, mapped element-wise by the given DTO. */
+export function collection<Src, Out>(
+  target: () => unknown,
+  path?: Path<Src>,
+): Resolver<Src, Out[], false> {
+  return {
+    kind: 'collection',
+    deps: path ? [path] : [],
+    fn: () => undefined,
+    target,
+  } as Resolver<Src, Out[], false>;
 }
 
 /** Reads a dotted path. API-surface only — the IR uses `PathSegment[]` (AD-12). */

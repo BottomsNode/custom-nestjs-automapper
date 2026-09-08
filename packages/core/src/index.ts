@@ -66,3 +66,6 @@ export { writeDropReason, writableFields, isHiddenOnRead } from './policy.js';
 // --- OpenAPI back-end (CAP-9) ---
 export { schemaOf } from './schema/openapi.js';
 export type { OpenApiSchema, SchemaOptions, OpenApiVersion } from './schema/openapi.js';
+export { nested, collection } from './dto/resolver.js';
+export { newOpState, MAX_DEPTH } from './emit/codegen.js';
+export type { OpState, ChildLookup } from './emit/codegen.js';
