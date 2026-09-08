@@ -1,6 +1,13 @@
 node_modules/
-docs/
-examples/
-__tests__/
 coverage/
 dist/
+*.tsbuildinfo
+.nx/
+
+# BMAD framework install (tooling, not project content).
+# _bmad-output/ IS tracked — it holds the spec, spine, and reviews.
+_bmad/
+
+.claude
+.agents
+skills-lock.json
