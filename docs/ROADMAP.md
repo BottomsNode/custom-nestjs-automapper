@@ -16,15 +16,33 @@ Last updated: 2026-09-09 · branch `v2` · 156 tests passing · **all phases com
 |---|---|---|---|
 | **0** | Nx + pnpm workspace, 3 packages, dual ESM/CJS, TS 6/7 split | — | ✅ done |
 | **1** | Descriptors, `Pick`/`extend`, typed paths | CAP-1, CAP-2, CAP-10 | ✅ done |
-| **2** | `MappingPlan` IR, planner, error taxonomy | CAP-4 | ✅ done · CAP-3 partial |
+| **2** | `MappingPlan` IR, planner, error taxonomy | CAP-4 | ✅ done |
 | **3** | Codegen emitter | — | ✅ done |
-| **4** | Projector + TypeORM adapter | CAP-5 | ✅ done · CAP-6 pending |
-| **5** | `Mapper` facade, NestJS module, seal lifecycle | CAP-3 | ✅ done · CLI pending |
+| **4** | Projector + TypeORM adapter | CAP-5 | ✅ done |
+| **5** | `Mapper` facade, NestJS module, seal lifecycle | CAP-3 | ✅ done |
 | **6** | Write path, drop-list policy, `forRootAsync` | CAP-8 | ✅ done |
 | **7** | `schemaOf` → OpenAPI | CAP-9 | ✅ done |
 | **8** | Nested/collection + identity map | CAP-6, CAP-7 | ✅ done |
 | **9** | Named mappers, `automapper check` CLI | CAP-3 | ✅ done |
 | **10** | `defaultTo`, type converters | — | ✅ done |
+| **11** | READMEs, LICENSE, CI | — | ✅ done |
+
+### Capability status
+
+| | Capability | Landed |
+|---|---|---|
+| CAP-1 | DTO without restating the entity | Phase 1 · 4 |
+| CAP-2 | Derived field declared once | Phase 1 |
+| CAP-3 | Broken mappings fail at boot **and in CI** | Phase 5 · 9 |
+| CAP-4 | Errors diagnosable from their text | Phase 2 |
+| CAP-5 | Fetch only what the DTO uses | Phase 4 |
+| CAP-6 | Nested pairs auto-registered | Phase 8 |
+| CAP-7 | Cyclic and shared graphs | Phase 8 |
+| CAP-8 | Write-side drop list | Phase 6 · 7 |
+| CAP-9 | OpenAPI from the descriptor | Phase 7 |
+| CAP-10 | Dependency typos are compile errors | Phase 1 |
+
+All ten are implemented and tested.
 
 ### Phase 0 — Workspace ✅
 
@@ -54,8 +72,8 @@ entering the IR (AD-12). `buildPlan` returns aggregated diagnostics rather
 than throwing on the first defect (AD-13). Errors carry structured payloads
 closed per code, rendered only by `core` (AD-5), with did-you-mean.
 
-CAP-3 is partial: defects are *detected* here, but nothing converts them to a
-boot failure until Phase 5 supplies `seal()`.
+Defects are detected here; Phase 5's `seal()` is what converts them into a
+boot failure, and Phase 9's CLI does the same for CI.
 
 ### Phase 3 — Codegen ✅
 
@@ -104,8 +122,11 @@ database-owned keys** — mass-assignment protection derived from the schema.
 `@Body() dto: CreateUserDto` works with no factory call and full DI.
 `forRootAsync` lands here too.
 
-Still pending: `reverse(ReadDto)` deriving a write DTO automatically. The
-policy and enforcement exist; only the derivation helper is missing.
+`Mapper.reverseOf(dto)` reports the writable fields and why each of the rest
+is refused. It returns names rather than a generated class, and that is a
+limit rather than an omission: a DTO's static type has to exist at
+declaration time, so a class built at seal could never be typed. Emitting a
+typed write DTO needs the CLI codegen path.
 
 ### Phase 7 — OpenAPI ✅
 
@@ -143,57 +164,13 @@ declared.
 > Full ecosystem coverage — all six `@automapper/*` packages, not just
 > `core` — is in **`ECOSYSTEM.md`**, along with the gaps it surfaced.
 
-## 2. Parity with `@automapper/core`
+## 2. Parity with `@automapper/*`
 
-Surface enumerated from its published source tree on 2026-09-08.
+Lives in **[`ECOSYSTEM.md`](ECOSYSTEM.md) §2** — one table, not two. It was
+duplicated here and drifted, which is the argument for keeping it in one place.
 
-### Mapping configuration
-
-| `@automapper/core` | Ours | Status |
-|---|---|---|
-| `forMember` | `compute` / `from` / `constant` | ✅ |
-| `autoMap` + `@AutoMap()` per property | `Pick(Entity, [...])` | ✅ replaced — no decorators, no plugin |
-| `namingConventions` | adapter owns conversion (AD-15) | ⚠️ adapter-side only |
-| `extend` (map inheritance) | — | ⬜ Phase 6 |
-| `constructUsing` | — | ⬜ Phase 6 |
-| `beforeMap` / `afterMap` | — | ⬜ Phase 6 |
-| `beforeMapArray` / `afterMapArray` | — | ⬜ Phase 6 |
-| `typeConverters` | — | ⬜ Phase 6 |
-| `forSelf` | — | ⬜ Phase 8 |
-
-### Member functions
-
-| `@automapper/core` | Ours | Status |
-|---|---|---|
-| `mapFrom` | `from(path)` | ✅ |
-| `fromValue` | `constant(value)` | ✅ |
-| `ignore` | `ignore()` | ✅ |
-| `mapInitialize` | implicit copy | ✅ |
-| `mapWithArguments` | `ctx` parameter | ✅ richer — typed, request-scoped |
-| `condition` / `preCondition` | `visible(pred, inner)` | ⚠️ context-gated; value predicates pending |
-| `nullSubstitution` | — | ⬜ Phase 6 |
-| `undefinedSubstitution` | — | ⬜ Phase 6 |
-| `convertUsing` | — | ⬜ Phase 6 |
-| `mapWith` / `mapDefer` | `nested()` / `collection()` | ⬜ Phase 8 |
-
-### Mapper API
-
-| `@automapper/core` | Ours | Status |
-|---|---|---|
-| `map` | `Mapper.map` | ✅ |
-| `mapArray` | `Mapper.mapArray` | ✅ |
-| `mapAsync` / `mapArrayAsync` | `Mapper.mapAsync` / `mapArrayAsync` | ✅ |
-| `mapMutate` | — | ⬜ not scheduled |
-| Profiles | `forRoot({ dtos })` | ⚠️ flat list; profile classes are SHOULD tier |
-| `addProfile` | `forFeature` | ⬜ deferred |
-| Strategies (`classes` / `pojos`) | schema adapters | ✅ replaced — pluggable per ORM |
-| Transformer plugin | **not required** | ✅ removed by design |
-
-**Deliberately not carried over:** the ts transformer plugin (a compiler-API
-consumer, so it cannot run under TypeScript 7), and `@AutoMap()` on every
-property of both sides.
-
----
+Summary: every in-scope surface of `core`, `classes`, and `nestjs` is covered,
+replaced with something better, or refused with a reason.
 
 ## 3. What we add that `@automapper/core` does not have
 
@@ -206,11 +183,12 @@ property of both sides.
 | **Typed dependency paths** (CAP-10) | A mistyped source path is a compile error; TypeScript volunteers the correction. | ✅ Phase 1 |
 | **Real codegen** (AD-3) | One emitted function per plan. No reflection in the hot path, and injection-safe. | ✅ Phase 3 |
 | **Async branding** (AD-9) | Synchronously mapping an async DTO is a compile error, not a runtime throw. | ✅ Phase 1 |
-| **Boot-time validation** (CAP-3) | An unresolved field fails `nest start`, not a request. | ✅ Phase 5 · CLI pending |
-| **Reverse mapping** (CAP-8) | Derives the write DTO, dropping database-owned fields from schema flags. Deleted from the incumbent because it had no schema to read. | ⬜ Phase 6 |
-| **OpenAPI generation** (CAP-9) | Schema from the descriptor — types, nullability, enums — with no `@ApiProperty`. | ⬜ Phase 7 |
-| **Cycle-safe graphs** (CAP-7) | Ancestor-chain detection, so shared references still map while true cycles terminate. | ⬜ Phase 8 |
-| **DTO-to-query compilation** | Skip entity hydration entirely. | ❌ 3.0 — see `scope-tiers.md` |
+| **Boot-time validation** (CAP-3) | An unresolved field fails `nest start`, and `automapper check` gives the same guarantee in CI. | ✅ Phase 5 · 9 |
+| **Write-side drop list** (CAP-8) | Database-owned fields refused at boot and at the request boundary, from schema flags. Deleted from the incumbent because it had no schema to read. | ✅ Phase 6 |
+| **OpenAPI generation** (CAP-9) | Schema from the descriptor — types, nullability, enums — with no `@ApiProperty`. | ✅ Phase 7 |
+| **Cycle-safe graphs** (CAP-7) | Identity map, so shared references map once while true cycles terminate. | ✅ Phase 8 |
+| **Mass-assignment protection** | A request body carrying a database-owned field is a 400, derived from the schema. | ✅ Phase 6 |
+| **DTO-to-query compilation** | Skip entity hydration entirely. | ⬜ 3.0 — deliberately deferred |
 
 ---
 
@@ -230,6 +208,26 @@ Kept as a record of what earned its keep.
 
 ---
 
+### Phase 10 — Remaining core parity ✅
+
+`defaultTo(inner, fallback)` covers `nullSubstitution` and
+`undefinedSubstitution` in one helper and narrows the field to `NonNullable`.
+Type converters answer `typeConverters`, keyed on the declared field type:
+`{ date: v => v.toISOString() }` converts every date field with none of them
+named — only expressible because each node carries its type.
+
+Four items were refused rather than built; reasons in `ECOSYSTEM.md` §4.
+
+### Phase 11 — Release surface ✅
+
+READMEs for all three packages, checked against the built bundles rather than
+written from memory. Root README replaced — it still documented the v1 API.
+`LICENSE` filled in; it was a zero-byte file while every manifest declared
+MIT. CI replaces the two v1 workflows and runs the development gate:
+typecheck on both TypeScript lines, tests, dual build, dependency invariants.
+
+---
+
 ## 5. Known gaps
 
 All closed as of 2026-09-09 except the two that need your account:
@@ -241,4 +239,26 @@ All closed as of 2026-09-09 except the two that need your account:
 | No `automapper check` CLI | ✅ boots the app context so CI seals the same pair set |
 | `forRootAsync` missing `useClass`/`useExisting` | ✅ both, via `AutomapperOptionsFactory` |
 | Self-referencing DTO TS2506 | ⚠️ inherent — annotate the thunk `(): unknown => Dto`. Runtime unaffected. |
+| Stale v1 root README, empty LICENSE, v1 workflows | ✅ replaced in Phase 11 |
 | npm org `@nestjs-automapper` | ⬜ needs `npm org create` under your account |
+
+## 6. Release readiness
+
+| | |
+|---|---|
+| Package manifests, `exports` maps, dual ESM/CJS | ✅ |
+| READMEs, LICENSE, `files` fields | ✅ |
+| CI running the full gate | ✅ |
+| npm org created | ⬜ **blocks publish** — `npm org create nestjs-automapper` |
+| Release workflow + changesets | ⬜ deliberately not written until the org exists; a workflow pointing at a non-existent scope is scaffolding |
+| Version | `2.0.0-alpha.0` across all three packages |
+
+## 7. After 2.0
+
+| | Why it waits |
+|---|---|
+| `defineSchema()` + `TypeToken` | Prisma models are TypeScript types with no runtime class, so the port has to widen. Ships with the Prisma adapter — `ECOSYSTEM.md` §1. |
+| Prisma adapter | 2.1 |
+| Proxy unwrapping | With whichever ORM needs it first; `mikro`'s `serializeEntity` is the precedent |
+| Mongoose, Drizzle adapters | 2.2+ |
+| `mapper.query()` — DTO-to-query compiler | 3.0. Judged the strongest idea from design and deliberately deferred: it turns a mapper into a query builder. |
