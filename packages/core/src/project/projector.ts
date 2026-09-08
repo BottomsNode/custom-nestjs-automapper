@@ -31,7 +31,7 @@ export function projectionFor(plan: MappingPlan, options: ProjectOptions = {}): 
   if (plan.requiresContext && options.ctx === undefined) {
     throw fail('CONTEXT_REQUIRED', {
       destType: plan.dest,
-      sourceType: plan.source,
+      sourceType: plan.source as never,
       gatedFields: plan.nodes.filter((n) => n.kind === 'gated').map((n) => n.field),
     });
   }

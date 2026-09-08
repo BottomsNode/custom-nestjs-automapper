@@ -6,7 +6,7 @@
  * the v1 defect.
  */
 
-import type { ClassLike, Instantiable } from '../descriptor/types.js';
+import type { AnySource, ClassLike, Instantiable } from '../descriptor/types.js';
 import type { AnyResolver, Resolver } from './resolver.js';
 
 /** Runtime field registry: picked ∪ computed keys, in declaration order. */
@@ -21,7 +21,7 @@ export const WRITE: unique symbol = Symbol.for('@nestjs-automapper/write');
 export interface DtoStatics {
   readonly [FIELDS]: readonly string[];
   readonly [RESOLVERS]: Readonly<Record<string, AnyResolver>>;
-  readonly [SOURCE]: ClassLike | undefined;
+  readonly [SOURCE]: AnySource | undefined;
   readonly [WRITE]?: true;
 }
 
@@ -36,7 +36,7 @@ export type DtoClass<T> = Instantiable<T> & DtoStatics;
  * the built-in inside a function of the same name.
  */
 export function Pick<T, const K extends readonly (keyof T & string)[]>(
-  Base: ClassLike<T>,
+  Base: ClassLike<T> | { readonly name: string; readonly __shape?: T },
   keys: K,
 ): DtoClass<Pick<T, K[number]>> {
   // `const K` over the tuple, rather than `K extends keyof T & string` over the
@@ -67,7 +67,7 @@ export function Pick<T, const K extends readonly (keyof T & string)[]>(
  * `CreateUserDto` carrying `id` fails at boot rather than at runtime.
  */
 export function Write<T, const K extends readonly (keyof T & string)[]>(
-  Base: ClassLike<T>,
+  Base: ClassLike<T> | { readonly name: string; readonly __shape?: T },
   keys: K,
 ): DtoClass<Pick<T, K[number]>> {
   const dto = Pick(Base, keys);
@@ -147,7 +147,7 @@ function attach<T>(
   ctor: Instantiable<T>,
   fields: readonly string[],
   resolvers: Readonly<Record<string, AnyResolver>>,
-  source: ClassLike | undefined,
+  source: AnySource | undefined,
 ): DtoClass<T> {
   Object.defineProperty(ctor, FIELDS, { value: Object.freeze(fields), enumerable: false });
   Object.defineProperty(ctor, RESOLVERS, { value: Object.freeze(resolvers), enumerable: false });

@@ -149,3 +149,44 @@ describe('AD-9 — async propagates up the closure', () => {
     expect(m.planOf(ParentDto)?.isAsync).toBe(true);
   });
 });
+
+describe('lazy relations', () => {
+  class LazyAddressDto extends Pick(Address, ['city']) {}
+
+  const lazyAdapter: SchemaAdapter = {
+    name: 'lazy',
+    supports: (t) => t === User || t === Address,
+    describe: (t): TypeDescriptor =>
+      t === Address
+        ? { type: Address, fields: [f('city')], relations: [], producedBy: 'lazy' }
+        : {
+            type: User,
+            fields: [f('id')],
+            relations: [
+              { name: 'address', target: () => Address, kind: 'one', nullable: true, isLazy: true },
+            ],
+            producedBy: 'lazy',
+          },
+  };
+
+  class LazyUserDto extends extend(Pick(User, ['id']), {
+    address: nested<User, unknown>(() => LazyAddressDto),
+  }) {}
+
+  const mapper = new Mapper().use(lazyAdapter).register(LazyUserDto);
+  mapper.seal();
+
+  it('forces the plan async, since the value is a Promise', () => {
+    expect(mapper.planOf(LazyUserDto)?.isAsync).toBe(true);
+  });
+
+  it('awaits the relation instead of writing the promise into the DTO', async () => {
+    const out = (await mapper.mapAsync(
+      { id: 'u1', address: Promise.resolve({ city: 'Pune' }) },
+      LazyUserDto,
+    )) as unknown as Record<string, unknown>;
+
+    expect(out['address']).toMatchObject({ city: 'Pune' });
+    expect(out['address']).not.toBeInstanceOf(Promise);
+  });
+});

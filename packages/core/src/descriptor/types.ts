@@ -66,15 +66,17 @@ export interface FieldMeta {
 export interface RelationMeta {
   readonly name: string;
   /** Lazy, so circular entity imports resolve. */
-  readonly target: () => ClassLike;
+  readonly target: () => AnySource;
   readonly kind: 'one' | 'many';
   readonly nullable: boolean;
   /** Foreign key columns — what a write-side reversal maps to (CAP-8). */
   readonly joinColumns?: readonly string[];
+  /** The value is a Promise, so mapping it must await (TypeORM lazy relations). */
+  readonly isLazy?: boolean;
 }
 
 export interface TypeDescriptor {
-  readonly type: ClassLike;
+  readonly type: AnySource;
   readonly fields: readonly FieldMeta[];
   readonly relations: readonly RelationMeta[];
   /** Adapter name, surfaced in diagnostics (AD-5). */
@@ -100,10 +102,16 @@ export interface FieldSelection {
  */
 export interface SchemaAdapter {
   readonly name: string;
-  supports(type: ClassLike): boolean;
-  describe(type: ClassLike): TypeDescriptor;
-  toNativeProjection?(selection: FieldSelection, type: ClassLike): unknown;
+  supports(type: AnySource): boolean;
+  describe(type: AnySource): TypeDescriptor;
+  toNativeProjection?(selection: FieldSelection, type: AnySource): unknown;
 }
+
+/**
+ * A mapping source. Destinations stay `ClassLike` because they are constructed;
+ * sources need not be, so a schema token can stand in for one.
+ */
+export type AnySource = ClassLike | { readonly name: string };
 
 /** Every flag false — the base an adapter overrides for what it can determine. */
 export const NO_PROVENANCE: Provenance = Object.freeze({

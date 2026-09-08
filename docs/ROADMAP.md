@@ -6,7 +6,7 @@ add that it does not have.
 **Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
 **Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
 
-Last updated: 2026-09-09 · branch `v2` · 156 tests passing · **all phases complete, all gaps closed**
+Last updated: 2026-09-09 · branch `v2` · 166 tests passing · **complete; only the npm org remains**
 
 ---
 
@@ -26,6 +26,7 @@ Last updated: 2026-09-09 · branch `v2` · 156 tests passing · **all phases com
 | **9** | Named mappers, `automapper check` CLI | CAP-3 | ✅ done |
 | **10** | `defaultTo`, type converters | — | ✅ done |
 | **11** | READMEs, LICENSE, CI | — | ✅ done |
+| **12** | Schema tokens, lazy relations, release pipeline | — | ✅ done |
 
 ### Capability status
 
@@ -228,6 +229,26 @@ typecheck on both TypeScript lines, tests, dual build, dependency invariants.
 
 ---
 
+### Phase 12 — The deferred work ✅
+
+`defineSchema()` returns a token that stands in for a source with no runtime
+class — Prisma models, Drizzle schemas, plain interfaces. It feeds the same
+descriptor every back-end reads, so such a source gets projection, OpenAPI and
+the write drop list, not just mapping. This unblocks the Prisma adapter.
+
+Only the *source* side of the port widened. Destinations stay `ClassLike`
+because they are constructed.
+
+TypeORM lazy relations hold a `Promise`. The adapter reports `isLazy`, which
+forces the plan async and makes the emitter await — otherwise the promise
+object itself lands in the DTO.
+
+Changesets with the three packages **fixed** to one version: they share an IR,
+so a consumer must not be able to half-upgrade. The release workflow runs the
+full gate before publishing and no-ops until the org and `NPM_TOKEN` exist.
+
+---
+
 ## 5. Known gaps
 
 All closed as of 2026-09-09 except the two that need your account:
@@ -238,7 +259,10 @@ All closed as of 2026-09-09 except the two that need your account:
 | No implicit primary key in projections | ✅ added in the adapter, not core: the neutral selection still reports only what the DTO consumes |
 | No `automapper check` CLI | ✅ boots the app context so CI seals the same pair set |
 | `forRootAsync` missing `useClass`/`useExisting` | ✅ both, via `AutomapperOptionsFactory` |
-| Self-referencing DTO TS2506 | ⚠️ inherent — annotate the thunk `(): unknown => Dto`. Runtime unaffected. |
+| Self-referencing DTO TS2506 | ⚠️ inherent to TypeScript — annotate the thunk `(): unknown => Dto`. Runtime unaffected. |
+| Non-class sources (Prisma, Drizzle) | ✅ `defineSchema()` — Phase 12 |
+| Proxy / lazy relation unwrapping | ✅ `isLazy` forces async and awaits — Phase 12 |
+| Release workflow + changesets | ✅ written; inert until the org exists |
 | Stale v1 root README, empty LICENSE, v1 workflows | ✅ replaced in Phase 11 |
 | npm org `@nestjs-automapper` | ⬜ needs `npm org create` under your account |
 
@@ -250,15 +274,13 @@ All closed as of 2026-09-09 except the two that need your account:
 | READMEs, LICENSE, `files` fields | ✅ |
 | CI running the full gate | ✅ |
 | npm org created | ⬜ **blocks publish** — `npm org create nestjs-automapper` |
-| Release workflow + changesets | ⬜ deliberately not written until the org exists; a workflow pointing at a non-existent scope is scaffolding |
+| Release workflow + changesets | ✅ written, gated on `NPM_TOKEN` |
 | Version | `2.0.0-alpha.0` across all three packages |
 
 ## 7. After 2.0
 
 | | Why it waits |
 |---|---|
-| `defineSchema()` + `TypeToken` | Prisma models are TypeScript types with no runtime class, so the port has to widen. Ships with the Prisma adapter — `ECOSYSTEM.md` §1. |
-| Prisma adapter | 2.1 |
-| Proxy unwrapping | With whichever ORM needs it first; `mikro`'s `serializeEntity` is the precedent |
+| Prisma adapter | 2.1 — `defineSchema()` and the widened port are in place, so this is now an adapter package rather than a port change |
 | Mongoose, Drizzle adapters | 2.2+ |
 | `mapper.query()` — DTO-to-query compiler | 3.0. Judged the strongest idea from design and deliberately deferred: it turns a mapper into a query builder. |

@@ -69,6 +69,8 @@ export interface NestedNode extends NodeBase {
   readonly kind: 'nested';
   readonly target: ClassLike;
   readonly relation: readonly PathSegment[];
+  /** Source value is a Promise and must be awaited before mapping. */
+  readonly isLazy?: boolean;
   /** Linked by value during seal, so no back-end looks the child up (AD-10). */
   childPlan?: unknown;
 }
@@ -78,6 +80,7 @@ export interface CollectionNode extends NodeBase {
   readonly kind: 'collection';
   readonly target: ClassLike;
   readonly relation: readonly PathSegment[];
+  readonly isLazy?: boolean;
   childPlan?: unknown;
 }
 
@@ -138,7 +141,9 @@ export function walk(node: ResolutionNode): ResolutionNode[] {
 
 /** True when this node or any descendant is async (AD-9 operates on the closure of these). */
 export function isNodeAsync(node: ResolutionNode): boolean {
-  return walk(node).some((n) => n.kind === 'resolve');
+  return walk(node).some(
+    (n) => n.kind === 'resolve' || ((n.kind === 'nested' || n.kind === 'collection') && n.isLazy === true),
+  );
 }
 
 /** True when this node or any descendant gates on context (AD-10's requiresContext). */

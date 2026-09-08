@@ -3,7 +3,7 @@
  * lowers them to `PathSegment[]` before they reach the IR (AD-12).
  */
 
-import type { ClassLike } from '../descriptor/types.js';
+import type { AnySource } from '../descriptor/types.js';
 
 /** Values a path may terminate on. */
 type Terminal = string | number | boolean | bigint | symbol | Date | null | undefined;
@@ -28,7 +28,7 @@ export type Path<T> = {
  */
 export type PathSegment =
   | { readonly kind: 'field'; readonly name: string }
-  | { readonly kind: 'relation'; readonly name: string; readonly target: ClassLike }
+  | { readonly kind: 'relation'; readonly name: string; readonly target: AnySource }
   | { readonly kind: 'index' }
   /** Terminal for projection: select `name`, never descend into `interior`. */
   | { readonly kind: 'json'; readonly name: string; readonly interior: readonly string[] };
