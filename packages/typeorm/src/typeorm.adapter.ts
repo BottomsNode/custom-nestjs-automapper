@@ -103,6 +103,9 @@ function toRelationMeta(relation: RelationMetadata): RelationMeta {
     target: () => resolveTarget(relation),
     kind: relation.isOneToMany || relation.isManyToMany ? 'many' : 'one',
     nullable: relation.isNullable === true,
+    // A lazy relation is a Promise on the entity. Reading it without awaiting
+    // yields the promise itself, so the plan has to become async.
+    isLazy: relation.isLazy === true,
     ...(joinColumns.length > 0 ? { joinColumns } : {}),
   };
 }

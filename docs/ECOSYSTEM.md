@@ -23,24 +23,31 @@ adapter that can follow later without changing anything here.
 
 ---
 
-## 1. Deferred: non-class sources
+## 1. Non-class sources — solved
 
-`Pick(User, [...])` needs `User` to exist at runtime. That holds for TypeORM
-entities. It does not hold for Prisma, whose models are generated TypeScript
-*types*, nor for Drizzle, Kysely, or plain interfaces.
+`Pick(User, [...])` needs `User` at runtime. That holds for TypeORM entities.
+It does not for Prisma, whose models are generated TypeScript *types*, nor for
+Drizzle, Kysely, or plain interfaces.
 
-`@automapper/pojos` solves this with a manual metadata map. With that package
-out of scope, the only remaining driver is the Prisma adapter — which is 2.1,
-after this release. So a `defineSchema()` token source is **deferred to
-whenever Prisma lands**, not built now.
+`defineSchema()` closes it:
 
-The one cost of deferring: widening `SchemaAdapter` later is a breaking change
-for third-party adapter authors. There are none yet, so the cost is currently
-zero and paying it early would be scaffolding.
+```ts
+export const PrismaUser = defineSchema('PrismaUser', {
+  id:        { type: 'string', isPrimary: true, isGenerated: true },
+  email:     { type: 'string' },
+  createdAt: { type: 'date', isCreateDate: true },
+});
 
-When it is built, it should feed the same descriptor every back-end reads —
-so a Prisma source still gets projection push-down, OpenAPI, and reverse
-mapping. `PojosMetadataMap` feeds mapping only.
+class ReadUserDto extends Pick(PrismaUser, ['id', 'email']) {}
+```
+
+**Why this beats `PojosMetadataMap`:** their metadata map feeds mapping only.
+This feeds the one descriptor every back-end reads, so a Prisma source also
+gets projection push-down, OpenAPI generation, and the write drop list — none
+of which `@automapper/pojos` can offer.
+
+Only the source side of the port widened; destinations stay constructible.
+The Prisma adapter is now an adapter package rather than a port change.
 
 ## 2. Per-package coverage
 
@@ -104,9 +111,9 @@ protection derived from the schema, which `MapPipe` has no way to compute.
 targeting in 2.0. Their existence still validates the `SchemaAdapter` port —
 five strategies over one engine is the shape we chose — and one detail is
 worth carrying forward regardless: `mikro`'s `serializeEntity` exists to
-unwrap lazy-loaded proxies and reference wrappers. Our emitted `s?.["x"]`
-would read a proxy field directly, so any adapter for a proxying ORM needs the
-same unwrap step.
+unwrap lazy-loaded proxies and reference wrappers. That warning has been
+acted on — `RelationMeta.isLazy` forces the plan async and makes the emitter
+await, so a lazy relation never lands in a DTO as a promise.
 
 ---
 

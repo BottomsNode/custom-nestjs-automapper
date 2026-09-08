@@ -7,7 +7,7 @@
  */
 
 import type { AdapterRegistry } from '../descriptor/registry.js';
-import type { ClassLike, FieldMeta, RelationMeta, TypeDescriptor } from '../descriptor/types.js';
+import type { AnySource, ClassLike, FieldMeta, RelationMeta, TypeDescriptor } from '../descriptor/types.js';
 import { AutomapperError, fail } from '../diagnose/automapper-error.js';
 import type { PathSegment } from '../dto/path.js';
 import { FIELDS, RESOLVERS, SOURCE, isDtoClass, isWriteDto } from '../dto/pick.js';
@@ -23,7 +23,7 @@ import {
 
 export interface MappingPlan {
   readonly key: string;
-  readonly source: ClassLike;
+  readonly source: AnySource;
   readonly dest: ClassLike;
   /** Exactly one top-level node per declared destination field (AD-2). */
   readonly nodes: readonly ResolutionNode[];
@@ -37,13 +37,13 @@ export type PlanResult =
   | { readonly ok: true; readonly plan: MappingPlan }
   | { readonly ok: false; readonly diagnostics: readonly AutomapperError[] };
 
-export const planKey = (source: ClassLike, dest: ClassLike): string =>
+export const planKey = (source: AnySource, dest: ClassLike): string =>
   `${source.name}::${dest.name}`;
 
 export function buildPlan(
   dest: ClassLike,
   registry: AdapterRegistry,
-  sourceOverride?: ClassLike,
+  sourceOverride?: AnySource,
 ): PlanResult {
   // Structural defects throw: without a field registry there is nothing to plan.
   if (!isDtoClass(dest)) throw fail('DEST_NOT_RUNTIME_CLASS', { destType: dest });
@@ -51,7 +51,7 @@ export function buildPlan(
   const dto = dest as unknown as {
     [FIELDS]: readonly string[];
     [RESOLVERS]: Readonly<Record<string, AnyResolver>>;
-    [SOURCE]: ClassLike | undefined;
+    [SOURCE]: AnySource | undefined;
   };
 
   const source = sourceOverride ?? dto[SOURCE];
@@ -75,7 +75,7 @@ export function buildPlan(
         diagnostics.push(
           fail('WRITE_FIELD_REJECTED', {
             destType: dest,
-            sourceType: source,
+            sourceType: source as ClassLike,
             field,
             reason,
             adapter: sourceDesc.producedBy,
@@ -120,7 +120,7 @@ function lowerCopy(
     diagnostics.push(
       fail('FIELD_UNRESOLVED', {
         destType: dest,
-        sourceType: sourceDesc.type,
+        sourceType: sourceDesc.type as ClassLike,
         field,
         adapter: sourceDesc.producedBy,
         nameCandidates: candidates,
@@ -147,7 +147,7 @@ function lowerResolver(
       diagnostics.push(
         fail('DEP_UNKNOWN', {
           destType: dest,
-          sourceType: sourceDesc.type,
+          sourceType: sourceDesc.type as ClassLike,
           field,
           path,
           adapter: sourceDesc.producedBy,
@@ -188,6 +188,7 @@ function lowerResolver(
       return { kind: 'ignore', field, deps: [], facts };
     case 'nested':
     case 'collection': {
+      // The child DTO, which is constructed — not a source-side token.
       const target = resolver.target?.() as ClassLike | undefined;
       if (!target) return undefined;
 
@@ -199,7 +200,7 @@ function lowerResolver(
         diagnostics.push(
           fail('DEP_UNKNOWN', {
             destType: dest,
-            sourceType: sourceDesc.type,
+            sourceType: sourceDesc.type as ClassLike,
             field,
             path: relPath,
             adapter: sourceDesc.producedBy,
@@ -214,6 +215,7 @@ function lowerResolver(
         field,
         target,
         relation,
+        ...(relMeta?.isLazy ? { isLazy: true as const } : {}),
         deps: [relation],
         facts: { type: 'unknown', nullable: relMeta?.nullable ?? true, producedBy: sourceDesc.producedBy },
       };
@@ -260,7 +262,7 @@ function lowerPath(
     // through this very lookup, which makes TS infer these circularly.
     const relation: RelationMeta | undefined = current.relations.find((r) => r.name === part);
     if (relation) {
-      const target: ClassLike = relation.target();
+      const target: AnySource = relation.target();
       segments.push({ kind: 'relation', name: part, target });
       current = registry.find(target) ? registry.describe(target) : undefined;
       continue;

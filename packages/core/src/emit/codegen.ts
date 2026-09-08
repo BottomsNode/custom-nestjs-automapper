@@ -170,15 +170,19 @@ function emit(node: ResolutionNode, slots: Slots): string[] {
 
     case 'nested': {
       const slot = pushChild(node.target, slots);
-      return [`${target} = ${KIDS}[${slot}](${access(node.relation)}, ${CTX}, ${OP});`];
+      // A lazy relation holds a Promise; awaiting is what stops the mapper
+      // writing the promise object into the DTO.
+      const value = node.isLazy ? `await ${access(node.relation)}` : access(node.relation);
+      return [`${target} = ${KIDS}[${slot}](${value}, ${CTX}, ${OP});`];
     }
 
     case 'collection': {
       const slot = pushChild(node.target, slots);
-      const items = access(node.relation);
+      const items = node.isLazy ? `await ${access(node.relation)}` : access(node.relation);
       return [
-        `${target} = Array.isArray(${items})`,
-        `  ? ${items}.map(function (e) { return ${KIDS}[${slot}](e, ${CTX}, ${OP}); })`,
+        `const items_${slot} = ${items};`,
+        `${target} = Array.isArray(items_${slot})`,
+        `  ? items_${slot}.map(function (e) { return ${KIDS}[${slot}](e, ${CTX}, ${OP}); })`,
         `  : [];`,
       ];
     }

@@ -8,7 +8,8 @@
 
 import { fail } from '../diagnose/automapper-error.js';
 import { FIELDS, RESOLVERS, isDtoClass } from '../dto/pick.js';
-import { NO_PROVENANCE, type ClassLike, type SchemaAdapter, type TypeDescriptor } from './types.js';
+import { schemaAdapter } from './schema.js';
+import { NO_PROVENANCE, type AnySource, type ClassLike, type SchemaAdapter, type TypeDescriptor } from './types.js';
 
 /**
  * Describes classes produced by `Pick`/`extend` from their runtime field
@@ -22,7 +23,7 @@ import { NO_PROVENANCE, type ClassLike, type SchemaAdapter, type TypeDescriptor 
 export const dtoAdapter: SchemaAdapter = {
   name: 'dto',
   supports: isDtoClass,
-  describe(type: ClassLike): TypeDescriptor {
+  describe(type: AnySource): TypeDescriptor {
     const dto = type as unknown as { [FIELDS]: readonly string[]; [RESOLVERS]: object };
     return {
       type,
@@ -48,19 +49,19 @@ export class AdapterRegistry {
   }
 
   /** First adapter whose `supports()` returns true. `supports()` must not throw (AD-17). */
-  find(type: ClassLike): SchemaAdapter | undefined {
-    return [...this.adapters, dtoAdapter].find((a) => a.supports(type));
+  find(type: AnySource): SchemaAdapter | undefined {
+    return [...this.adapters, schemaAdapter, dtoAdapter].find((a) => a.supports(type));
   }
 
-  describe(type: ClassLike): TypeDescriptor {
+  describe(type: AnySource): TypeDescriptor {
     const adapter = this.find(type);
     if (!adapter) {
-      throw fail('NO_ADAPTER', { type, registered: this.names() });
+      throw fail('NO_ADAPTER', { type: type as ClassLike, registered: this.names() });
     }
     return adapter.describe(type);
   }
 
   names(): string[] {
-    return [...this.adapters.map((a) => a.name), dtoAdapter.name];
+    return [...this.adapters.map((a) => a.name), schemaAdapter.name, dtoAdapter.name];
   }
 }

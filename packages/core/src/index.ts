@@ -72,3 +72,8 @@ export type { OpState, ChildLookup } from './emit/codegen.js';
 export { defaultTo } from './dto/resolver.js';
 export type { TypeConverters } from './emit/codegen.js';
 export type { MapperOptions } from './mapper.js';
+
+// --- schema tokens: sources with no runtime class ---
+export { defineSchema, isSchemaToken, schemaAdapter, SCHEMA } from './descriptor/schema.js';
+export type { SchemaToken, TypeToken, SchemaSpec, FieldSpec, RelationSpec, ShapeOf } from './descriptor/schema.js';
+export type { AnySource } from './descriptor/types.js';

@@ -192,7 +192,7 @@ export class Mapper<Ctx = unknown> {
     const plan = this.planFor(dto, 'nativeProjectionFor');
     const adapter = this.registry.find(plan.source);
     if (!adapter?.toNativeProjection) {
-      throw fail('NO_ADAPTER', { type: plan.source, registered: this.registry.names() });
+      throw fail('NO_ADAPTER', { type: plan.source as ClassLike, registered: this.registry.names() });
     }
     return adapter.toNativeProjection(projectionFor(plan, options), plan.source);
   }
