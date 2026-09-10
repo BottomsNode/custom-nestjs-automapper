@@ -19,5 +19,6 @@
     },
     "typecheck": { "dependsOn": ["^build"], "cache": true },
     "typecheck:ts7": { "dependsOn": ["^build"], "cache": true }
-  }
+  },
+  "analytics": false
 }
