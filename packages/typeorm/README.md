@@ -22,7 +22,7 @@ reads the metadata TypeORM already has.
 ## Projection
 
 ```ts
-const find = mapper.nativeProjectionFor(ReadUserDto);
+const find = mapper.nativeProjectionFor(ReadUserDto) as FindManyOptions<User>;
 // { select: { id: true, email: true, firstName: true, lastName: true } }
 
 await repo.find(find);

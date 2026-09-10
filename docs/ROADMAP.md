@@ -10,7 +10,7 @@ add that it does not have.
 **Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
 **Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
 
-Last updated: 2026-09-09 · branch `v2` · **complete; only the npm org remains**
+Last updated: 2026-09-10 · **2.0.0 released**
 
 ---
 
@@ -280,7 +280,9 @@ All closed as of 2026-09-09 except the two that need your account:
 | CI running the full gate | ✅ |
 | npm org created | ⬜ **blocks publish** — `npm org create nestjs-automapper` |
 | Release workflow + changesets | ✅ written, gated on `NPM_TOKEN` |
-| Version | `2.0.0-alpha.0` across all three packages |
+| Version | `2.0.0` across all three packages — see `CHANGELOG.md` |
+| Docs | Root README, per-package READMEs, `CHANGELOG.md`, `docs/MIGRATION.md` |
+| `custom-automapper` 1.x | superseded; to be deprecated on npm once 2.0 is published |
 
 ## 7. After 2.0
 
