@@ -11,6 +11,11 @@ updates:
     groups:
       actions:
         patterns: ['*']
+    ignore:
+      # v2 needs Changesets CLI v3 and renames the inputs release.yml uses.
+      # Lift this together with the move to @changesets/cli v3.
+      - dependency-name: changesets/action
+        update-types: ['version-update:semver-major']
 
   # No npm entry yet: Dependabot does not support pnpm 12
   # (dependabot/dependabot-core#16095) and fails on this repo. Add one for
