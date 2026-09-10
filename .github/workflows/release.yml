@@ -15,15 +15,15 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 12.3.4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.13
           cache: pnpm
@@ -34,15 +34,18 @@ jobs:
       # Never publish something that does not pass the same gate as a PR.
       - run: pnpm verify
 
-      # Opens a version PR when changesets are pending; publishes when that PR
-      # has been merged. Requires the @nestjs-automapper npm org to exist and
-      # NPM_TOKEN to be set, so it no-ops harmlessly until both are in place.
+      # Opens a version PR when changesets are pending; publishes any version
+      # not yet on npm otherwise. NPM_TOKEN must be a token with publish rights
+      # on the @nestjs-automapper org — without them npm answers 404.
       - uses: changesets/action@v1
         with:
           version: pnpm version-packages
           publish: pnpm release
           commit: 'chore: version packages'
           title: 'chore: version packages'
+          # One `vX.Y.Z` release per version, not one per package: the three
+          # packages are fixed to a single version.
+          createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
