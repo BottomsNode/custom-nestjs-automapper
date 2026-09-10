@@ -12,16 +12,6 @@ updates:
       actions:
         patterns: ['*']
 
-  # Root devDependencies, the packages' own manifests, and the peer-range
-  # catalog in pnpm-workspace.yaml. Minor and patch bumps land as one weekly
-  # PR; majors get a PR each, since a peer major is a breaking change here.
-  - package-ecosystem: npm
-    directories: ['/', '/packages/*']
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: chore
-      include: scope
-    groups:
-      minor-and-patch:
-        update-types: [minor, patch]
+  # No npm entry yet: Dependabot does not support pnpm 12
+  # (dependabot/dependabot-core#16095) and fails on this repo. Add one for
+  # directories ['/', '/packages/*'] once that ships.
