@@ -287,8 +287,17 @@ All closed as of 2026-09-11:
 
 ## 7. After 2.0
 
-| | Why it waits |
+The plan lives on GitHub, not in this file: each future version is a
+[milestone](https://github.com/nishit-shivdasani/nestjs-automapper/milestones)
+and each piece of work an issue in it. This file stays as the record of how
+2.0 was built.
+
+| Milestone | Theme |
 |---|---|
-| Prisma adapter | 2.1 — `defineSchema()` and the widened port are in place, so this is now an adapter package rather than a port change |
-| Mongoose, Drizzle adapters | 2.2+ |
-| `mapper.query()` — DTO-to-query compiler | 3.0. Judged the strongest idea from design and deliberately deferred: it turns a mapper into a query builder. |
+| 2.1 | Prisma adapter, `class-validator` as a schema source |
+| 2.2 | Mongoose and Drizzle adapters |
+| 3.0 | `mapper.query()` DTO-to-query compiler, relation → foreign-key reverse mapping |
+| Backlog | Wanted but not scheduled |
+
+Feature requests go through
+[a new issue](https://github.com/nishit-shivdasani/nestjs-automapper/issues/new/choose).
