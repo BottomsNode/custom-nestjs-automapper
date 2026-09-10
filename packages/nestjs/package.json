@@ -1,8 +1,26 @@
 {
   "name": "@nestjs-automapper/nestjs",
-  "version": "2.0.0-alpha.0",
+  "version": "2.0.0",
   "description": "NestJS integration for @nestjs-automapper",
   "license": "MIT",
+  "author": "Nishit Shivdasani",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nishit-shivdasani/custom-nestjs-automapper.git",
+    "directory": "packages/nestjs"
+  },
+  "homepage": "https://github.com/nishit-shivdasani/custom-nestjs-automapper/tree/master/packages/nestjs#readme",
+  "bugs": {
+    "url": "https://github.com/nishit-shivdasani/custom-nestjs-automapper/issues"
+  },
+  "keywords": [
+    "nestjs",
+    "automapper",
+    "mapper",
+    "dto",
+    "interceptor",
+    "mass-assignment"
+  ],
   "type": "module",
   "sideEffects": false,
   "engines": {

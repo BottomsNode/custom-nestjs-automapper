@@ -7,7 +7,11 @@
   "author": "Nishit Shivdasani",
   "repository": {
     "type": "git",
-    "url": "https://github.com/BottomsNode/custom-automapper.git"
+    "url": "git+https://github.com/nishit-shivdasani/custom-nestjs-automapper.git"
+  },
+  "homepage": "https://github.com/nishit-shivdasani/custom-nestjs-automapper#readme",
+  "bugs": {
+    "url": "https://github.com/nishit-shivdasani/custom-nestjs-automapper/issues"
   },
   "packageManager": "pnpm@12.3.4",
   "engines": {
