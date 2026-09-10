@@ -32,11 +32,16 @@ Nested relations are closed over automatically, so only top-level DTOs go in
 
 ### Async configuration
 
+With `@nestjs/typeorm`, inject the `DataSource` so the adapter reads metadata
+from the live connection:
+
 ```ts
 AutomapperModule.forRootAsync({
-  imports: [ConfigModule],
-  inject: [ConfigService],
-  useFactory: (config: ConfigService) => ({ adapters: [typeorm(config.dataSource)] }),
+  inject: [DataSource],
+  useFactory: (dataSource: DataSource) => ({
+    adapters: [typeorm(dataSource)],
+    dtos: [ReadUserDto, CreateUserDto],
+  }),
 });
 ```
 
@@ -52,7 +57,7 @@ export class UsersController {
   @Get()
   @MapTo(ReadUserDto)
   findAll() {
-    return this.repo.find(this.mapper.nativeProjectionFor(ReadUserDto));
+    return this.repo.find(this.mapper.nativeProjectionFor(ReadUserDto) as FindManyOptions<User>);
   }
 }
 ```
@@ -100,10 +105,21 @@ constructor(@InjectMapper('tenant-a') private readonly mapper: Mapper) {}
 ## Swagger
 
 Computed fields have no declaration site for `@ApiProperty`, so generate the
-schema instead:
+schema instead. The mapper is sealed during boot, after decorators have run,
+so register the schema on the document in `main.ts` and reference it:
 
 ```ts
-@ApiOkResponse({ schema: mapper.schemaOf(ReadUserDto) })
+const mapper = app.get<Mapper>(getMapperToken());
+const document = SwaggerModule.createDocument(app, config);
+document.components = {
+  ...document.components,
+  schemas: { ...document.components?.schemas, ReadUserDto: mapper.schemaOf(ReadUserDto) as object },
+};
+SwaggerModule.setup('docs', app, document);
+```
+
+```ts
+@ApiOkResponse({ schema: { $ref: '#/components/schemas/ReadUserDto' } })
 ```
 
 ## Options

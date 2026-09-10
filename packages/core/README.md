@@ -25,12 +25,16 @@ plugin.
 import { Pick, extend, compute } from '@nestjs-automapper/core';
 
 export class ReadUserDto extends extend(Pick(User, ['id', 'email', 'createdAt']), {
-  fullName: compute(['firstName', 'lastName'], u => `${u.firstName} ${u.lastName}`),
+  fullName: compute<User, string>(['firstName', 'lastName'], (u) => `${u.firstName} ${u.lastName}`),
 }) {}
 ```
 
 `fullName` is declared once. Its return type becomes the field's static type,
 and its function becomes the runtime resolution.
+
+Resolvers take the source and output types explicitly (`compute<User, string>`).
+Inside `extend` there is nothing to infer the source from, and the explicit
+source type is what makes dependency paths type-checked.
 
 > Use a class declaration, not `const X = extend(...)` plus
 > `type X = InstanceType<typeof X>`. The self-referential alias makes
@@ -76,8 +80,8 @@ projector that guessed would under-fetch and the field would resolve to
 Paths are typed, so a typo is a compile error — and TypeScript suggests the fix:
 
 ```ts
-compute(['firstNmae'], …)   // Type '"firstNmae"' is not assignable to Path<User>.
-                            // Did you mean '"firstName"'?
+compute<User, string>(['firstNmae'], …)   // Type '"firstNmae"' is not assignable to Path<User>.
+                                          // Did you mean '"firstName"'?
 ```
 
 ## Projection
