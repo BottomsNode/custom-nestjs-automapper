@@ -1,8 +1,27 @@
 {
   "name": "@nestjs-automapper/core",
-  "version": "2.0.0-alpha.0",
+  "version": "2.0.0",
   "description": "Schema-aware object mapping for TypeScript — zero dependencies",
   "license": "MIT",
+  "author": "Nishit Shivdasani",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nishit-shivdasani/custom-nestjs-automapper.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/nishit-shivdasani/custom-nestjs-automapper#readme",
+  "bugs": {
+    "url": "https://github.com/nishit-shivdasani/custom-nestjs-automapper/issues"
+  },
+  "keywords": [
+    "automapper",
+    "mapper",
+    "object-mapper",
+    "dto",
+    "projection",
+    "openapi",
+    "typescript"
+  ],
   "type": "module",
   "sideEffects": false,
   "engines": {

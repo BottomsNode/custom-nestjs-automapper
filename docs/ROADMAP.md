@@ -10,7 +10,7 @@ add that it does not have.
 **Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
 **Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
 
-Last updated: 2026-09-10 · **2.0.0 released**
+Last updated: 2026-09-11 · **2.0.0 released**
 
 ---
 
