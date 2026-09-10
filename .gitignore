@@ -4,9 +4,9 @@ dist/
 *.tsbuildinfo
 .nx/
 
-# BMAD framework install (tooling, not project content).
-# _bmad-output/ IS tracked — it holds the spec, spine, and reviews.
+# Internal planning tooling and its output: for maintainers, not users.
 _bmad/
+_bmad-output/
 
 .claude
 .agents
@@ -17,4 +17,3 @@ skills-lock.json
 *.test-d.ts
 vitest.config.*
 packages/typeorm/src/sql-js.d.ts
-_bmad-output/specs/*/spike/

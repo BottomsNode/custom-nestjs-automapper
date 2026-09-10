@@ -1,13 +1,13 @@
 # @nestjs-automapper v2 — Design Record
 
 > [!WARNING]
-> **SUPERSEDED.** This draft is absorbed into
-> `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md`, which is the canonical
-> contract. Five decisions here are stale: `visible()` and async enforcement moved
-> to compile time; the caching section is void (replaced by a per-operation identity
-> map); `createMap` is demoted to optional; the DTO-descriptor gap is answered by an
-> entity-derived DTO class; and OpenAPI schema generation is new scope not present
-> below. Read the SPEC, not this file. Retained for traceability only.
+> **SUPERSEDED.** This early draft was replaced by the 2.0 spec. Five decisions
+> here are stale: `visible()` and async enforcement moved to compile time; the
+> caching section is void (replaced by a per-operation identity map); `createMap`
+> is demoted to optional; the DTO-descriptor gap is answered by an entity-derived
+> DTO class; and OpenAPI schema generation is new scope not present below. For
+> what shipped, read the package READMEs and `docs/ROADMAP.md`. Retained for
+> traceability only.
 
 
 Status: decisions locked, implementation not started.

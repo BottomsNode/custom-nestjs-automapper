@@ -7,8 +7,8 @@ add that it does not have.
 > committed nor published — see `TESTING.md`. Test counts quoted below are
 > historical, recorded at the time each phase was verified.
 
-**Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
-**Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
+`CAP-n` (capabilities) and `AD-n` (architecture decisions) refer to the 2.0
+design spec, which is kept internal.
 
 Last updated: 2026-09-11 · **2.0.1 published to npm**
 
