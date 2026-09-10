@@ -29,16 +29,31 @@ export interface DtoStatics {
 export type DtoClass<T> = Instantiable<T> & DtoStatics;
 
 /**
- * Declare a DTO carrying a subset of `Base`'s fields.
+ * Declares a read DTO carrying a subset of `Base`'s fields.
  *
- * Naming this `Pick` does not shadow TypeScript's built-in `Pick<T, K>` — value
- * and type namespaces are separate, which is why the return type below can use
- * the built-in inside a function of the same name.
+ * Returns a real class: extend it with a class declaration. Picked fields are
+ * copied by name and checked against the schema when the mapper seals.
+ *
+ * @param Base - An entity class, or a token from `defineSchema()`.
+ * @param keys - The fields to carry. A key the source does not declare is a compile error.
+ *
+ * @example
+ * ```ts
+ * export class UserDto extends Pick(User, ['id', 'email', 'createdAt']) {}
+ * ```
+ *
+ * @remarks
+ * Declare `class X extends Pick(...)`. The `const X = Pick(...)` plus
+ * `type X = InstanceType<typeof X>` form makes TypeScript widen the DTO back
+ * to every field of the source.
  */
 export function Pick<T, const K extends readonly (keyof T & string)[]>(
   Base: ClassLike<T> | { readonly name: string; readonly __shape?: T },
   keys: K,
 ): DtoClass<Pick<T, K[number]>> {
+  // Naming this `Pick` does not shadow the built-in `Pick<T, K>`: value and
+  // type namespaces are separate, so the return type above can use it.
+  //
   // `const K` over the tuple, rather than `K extends keyof T & string` over the
   // element: with the element form, calling Pick inline as an argument resolves
   // K before T and falls back to K's constraint — `keyof T` — which readmits
@@ -62,9 +77,20 @@ export function Pick<T, const K extends readonly (keyof T & string)[]>(
 }
 
 /**
- * A DTO for the write path: same shape as `Pick`, but the planner rejects any
- * field the database owns (AD-14) instead of silently dropping it, so a
- * `CreateUserDto` carrying `id` fails at boot rather than at runtime.
+ * Declares a write DTO: the fields a client may send.
+ *
+ * Like `Pick`, with two checks added:
+ * - Declaring a field the database owns (primary key, generated column,
+ *   create/update/delete timestamp, version, discriminator) fails `seal()`.
+ * - `mapper.mapInput()` and the NestJS `MapBodyPipe` reject any request key
+ *   the DTO does not declare.
+ *
+ * `select: false` columns such as `password` are writable.
+ *
+ * @example
+ * ```ts
+ * export class CreateUserDto extends Write(User, ['email', 'password', 'firstName']) {}
+ * ```
  */
 export function Write<T, const K extends readonly (keyof T & string)[]>(
   Base: ClassLike<T> | { readonly name: string; readonly __shape?: T },
@@ -94,9 +120,24 @@ type AnyAsync<R> = true extends {
 export type AsyncBrand<A extends boolean> = { readonly __async: A };
 
 /**
- * Attach derived fields to a DTO. Each resolver is the field's single
- * declaration site — its return type becomes the field's static type, and its
- * function becomes the runtime resolution (AD-19.4).
+ * Adds derived fields to a `Pick` or `Write` DTO.
+ *
+ * Each resolver declares its field once: its output type becomes the field's
+ * type, and its function produces the value. Give resolvers their source and
+ * output types explicitly (`compute<User, string>`). That is what makes the
+ * dependency paths type-checked.
+ *
+ * @example
+ * ```ts
+ * export class UserDto extends extend(Pick(User, ['id', 'email']), {
+ *   fullName: compute<User, string>(['firstName', 'lastName'], (u) => `${u.firstName} ${u.lastName}`),
+ *   posts: collection<User, PostDto>(() => PostDto),
+ * }) {}
+ * ```
+ *
+ * @remarks
+ * A DTO with any `resolve()` field is async. Map it with `mapAsync()`, because
+ * calling `map()` on it is a type error.
  */
 export function extend<
   // Inferred from the concrete class, then narrowed with InstanceType. Inferring

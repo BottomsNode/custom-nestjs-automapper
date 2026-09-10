@@ -29,6 +29,20 @@ export interface TypeOrmProjection {
   readonly relations?: Record<string, unknown>;
 }
 
+/**
+ * A schema adapter that reads TypeORM's entity metadata: columns, relations,
+ * nullability, enums, and which columns the database owns. Entities need no
+ * mapping decorators.
+ *
+ * Metadata is read when the mapper seals, so `dataSource` must be initialized
+ * by then. With `@nestjs/typeorm`, inject it through
+ * `AutomapperModule.forRootAsync`.
+ *
+ * @example
+ * ```ts
+ * const mapper = new Mapper().use(typeorm(dataSource)).register(UserDto);
+ * ```
+ */
 export function typeorm(dataSource: DataSource): SchemaAdapter {
   return {
     name: ADAPTER_NAME,
@@ -146,14 +160,18 @@ function toFieldKind(column: ColumnMetadata): FieldKind {
 }
 
 /**
- * Neutral selection → TypeORM find options. This translation is the whole
- * reason `core` stays zero-dependency: it knows nothing about `select` or
- * `relations`, and a second ORM is a second function like this one.
+ * Translates a `FieldSelection` into TypeORM `{ select, relations }` find
+ * options. `mapper.nativeProjectionFor()` calls this for you. Use it directly
+ * only when you have a selection from `mapper.projectionFor()`.
+ *
+ * @param primaryKeys - Always selected, because TypeORM needs them to hydrate relations.
  */
 export function toFindOptions(
   selection: FieldSelection,
   primaryKeys: readonly string[] = [],
 ): TypeOrmProjection {
+  // This translation is why `core` stays zero-dependency: it knows nothing
+  // about `select` or `relations`, and a second ORM is a second function.
   const select: Record<string, unknown> = {};
   for (const field of selection.fields) select[field] = true;
 

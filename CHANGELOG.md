@@ -29,6 +29,9 @@ reached the registry, so 2.0.1 is the version to install.
   [`nishit-shivdasani/nestjs-automapper`](https://github.com/nishit-shivdasani/nestjs-automapper).
   Package metadata and documentation links now point there.
 - CI builds before type-checking, and all workflows run on Node 24 actions.
+- Editor hovers document the public API: DTO builders, resolvers, `Mapper`
+  methods (including what they throw), `AutomapperError`, the adapter contract,
+  and the NestJS module and decorators.
 
 ## [2.0.0] — 2026-09-11
 

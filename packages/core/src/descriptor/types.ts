@@ -97,13 +97,27 @@ export interface FieldSelection {
 }
 
 /**
- * The port. `supports()` must be a pure, non-throwing predicate: no I/O, and
- * an adapter that cannot answer returns `false` (AD-17).
+ * Connects an ORM or other schema source to the mapper. Implement this to
+ * support a new ORM; `@nestjs-automapper/typeorm` is a complete example.
  */
 export interface SchemaAdapter {
+  /** Shown in diagnostics. */
   readonly name: string;
+  /**
+   * Whether this adapter describes `type`. Must be pure and must never throw:
+   * return `false` when unsure.
+   */
   supports(type: AnySource): boolean;
+  /**
+   * Every field and relation the schema declares, unfiltered. The mapper
+   * applies the read and write rules itself. Set every provenance flag
+   * explicitly, with `false` meaning "checked, and no".
+   */
   describe(type: AnySource): TypeDescriptor;
+  /**
+   * Translates a selection into the ORM's own query options. Optional;
+   * `mapper.nativeProjectionFor()` needs it.
+   */
   toNativeProjection?(selection: FieldSelection, type: AnySource): unknown;
 }
 
