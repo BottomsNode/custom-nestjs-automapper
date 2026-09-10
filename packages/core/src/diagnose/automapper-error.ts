@@ -40,16 +40,19 @@ function render<C extends ErrorCode>(code: C, payload: ErrorPayloads[C]): string
   switch (code) {
     case 'MAPPING_NOT_FOUND': {
       const q = p as ErrorPayloads['MAPPING_NOT_FOUND'];
-      lines.push(`  no map ${nameOf(q.sourceType)} → ${nameOf(q.destType)}`);
+      // A mapping is keyed by its DTO, whose source is fixed by Pick/Write, so
+      // the DTO alone names the pair.
+      const dto = nameOf(q.destType);
+      lines.push(`  ${dto} was not planned when the mapper was sealed`);
       const others = (q.typeCandidates ?? []).map(nameOf);
       if (others.length > 0) {
-        lines.push('', `  registered from ${nameOf(q.sourceType)}: ${others.join(', ')}`);
-        const near = nearest(nameOf(q.destType), others);
+        lines.push('', `  planned: ${others.join(', ')}`);
+        const near = nearest(dto, others);
         if (near) lines.push(`  did you mean ${near}?`);
       } else {
-        lines.push('', `  nothing is registered from ${nameOf(q.sourceType)}.`);
+        lines.push('', '  no DTOs were planned.');
       }
-      lines.push('', `  register it:  createMap(${nameOf(q.sourceType)}, ${nameOf(q.destType)})`);
+      lines.push('', `  register it:  mapper.register(${dto}) before seal(), or add it to AutomapperModule's dtos.`);
       break;
     }
 
@@ -101,7 +104,7 @@ function render<C extends ErrorCode>(code: C, payload: ErrorPayloads[C]): string
       const q = p as ErrorPayloads['CYCLE_REQUIRED_FIELD'];
       lines.push(`  cycle: ${q.cycle.join(' → ')}`);
       lines.push(`  ${q.field} is required, so it cannot be omitted`);
-      lines.push('', "  make it optional, or set cycles: 'ref' on the map.");
+      lines.push('', '  make the back-edge optional, or map it with nested() so the identity map closes the cycle.');
       break;
     }
 

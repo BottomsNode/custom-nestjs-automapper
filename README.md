@@ -3,7 +3,7 @@
 **The object mapper that knows your schema.**
 
 [![npm](https://img.shields.io/npm/v/@nestjs-automapper/core?label=%40nestjs-automapper%2Fcore)](https://www.npmjs.com/package/@nestjs-automapper/core)
-[![CI](https://github.com/nishit-shivdasani/custom-nestjs-automapper/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/nishit-shivdasani/custom-nestjs-automapper/actions/workflows/ci.yml)
+[![CI](https://github.com/nishit-shivdasani/nestjs-automapper/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/nishit-shivdasani/nestjs-automapper/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 An object mapper for TypeScript and NestJS that reads your ORM's metadata.
