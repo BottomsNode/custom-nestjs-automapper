@@ -29,11 +29,11 @@
     "release": "pnpm build && changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.7",
     "@nx/js": "23.2.0",
-    "@types/node": "^22.13.0",
+    "@types/node": "^22.20.2",
     "nx": "23.2.0",
     "typescript": "npm:@typescript/typescript6@6.0.2",
-    "typescript7": "npm:typescript@7.0.2",
-    "@changesets/cli": "^2.29.7"
+    "typescript7": "npm:typescript@7.0.2"
   }
 }

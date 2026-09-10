@@ -7,6 +7,12 @@ allowBuilds:
   # nx ships a platform-native binary and needs its postinstall.
   nx: true
 
+# smol-toml <=1.7.0 has a DoS advisory (GHSA-7w5x-hrqm-74c2). It arrives only
+# through nx, a dev tool, and nx 23.2.1 still pins 1.6.1. Drop this once nx
+# depends on a patched version.
+overrides:
+  smol-toml: '>=1.7.1'
+
 catalog:
   '@nestjs/common': ^12.0.1
   '@nestjs/core': ^12.0.1

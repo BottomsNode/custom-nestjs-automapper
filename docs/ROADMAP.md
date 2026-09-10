@@ -10,7 +10,7 @@ add that it does not have.
 **Contract:** `_bmad-output/specs/spec-nestjs-automapper-2/SPEC.md` (CAP-1…CAP-10)
 **Invariants:** `_bmad-output/planning-artifacts/architecture/architecture-custom-nestjs-automapper-2026-09-08/ARCHITECTURE-SPINE.md` (AD-1…AD-20)
 
-Last updated: 2026-09-11 · **2.0.0 released**
+Last updated: 2026-09-11 · **2.0.1 published to npm**
 
 ---
 
@@ -249,13 +249,14 @@ object itself lands in the DTO.
 
 Changesets with the three packages **fixed** to one version: they share an IR,
 so a consumer must not be able to half-upgrade. The release workflow runs the
-full gate before publishing and no-ops until the org and `NPM_TOKEN` exist.
+full gate before publishing and authenticates to npm through Trusted
+Publishing (OIDC), so no npm token is stored anywhere.
 
 ---
 
 ## 5. Known gaps
 
-All closed as of 2026-09-09 except the two that need your account:
+All closed as of 2026-09-11:
 
 | Was | Status |
 |---|---|
@@ -266,9 +267,9 @@ All closed as of 2026-09-09 except the two that need your account:
 | Self-referencing DTO TS2506 | ⚠️ inherent to TypeScript — annotate the thunk `(): unknown => Dto`. Runtime unaffected. |
 | Non-class sources (Prisma, Drizzle) | ✅ `defineSchema()` — Phase 12 |
 | Proxy / lazy relation unwrapping | ✅ `isLazy` forces async and awaits — Phase 12 |
-| Release workflow + changesets | ✅ written; inert until the org exists |
+| Release workflow + changesets | ✅ publishes through Trusted Publishing |
 | Stale v1 root README, empty LICENSE, v1 workflows | ✅ replaced in Phase 11 |
-| npm org `@nestjs-automapper` | ⬜ needs `npm org create` under your account |
+| npm org `@nestjs-automapper` | ✅ created; 2.0.1 published 2026-09-11 |
 
 ## 6. Release readiness
 
@@ -278,11 +279,11 @@ All closed as of 2026-09-09 except the two that need your account:
 | Tests excluded from git and from the published tarball | ✅ — see `TESTING.md` |
 | READMEs, LICENSE, `files` fields | ✅ |
 | CI running the full gate | ✅ |
-| npm org created | ⬜ **blocks publish** — `npm org create nestjs-automapper` |
-| Release workflow + changesets | ✅ written, gated on `NPM_TOKEN` |
-| Version | `2.0.0` across all three packages — see `CHANGELOG.md` |
+| npm org created | ✅ |
+| Release workflow + changesets | ✅ Trusted Publishing, no npm token |
+| Version | `2.0.1` across all three packages, on npm — see `CHANGELOG.md` |
 | Docs | Root README, per-package READMEs, `CHANGELOG.md`, `docs/MIGRATION.md` |
-| `custom-automapper` 1.x | superseded; to be deprecated on npm once 2.0 is published |
+| `custom-automapper` 1.x | superseded; npm deprecation pending |
 
 ## 7. After 2.0
 
