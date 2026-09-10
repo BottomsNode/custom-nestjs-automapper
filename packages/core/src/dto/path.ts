@@ -8,19 +8,29 @@ import type { AnySource } from '../descriptor/types.js';
 /** Values a path may terminate on. */
 type Terminal = string | number | boolean | bigint | symbol | Date | null | undefined;
 
+/** Remaining relation hops, counted down. `never` ends the recursion. */
+type Hops = [never, 0, 1, 2, 3];
+
 /**
  * Every addressable dotted path on `T`, as a union of string literals.
  *
  * A typo is therefore a compile error, and TypeScript volunteers the correction
  * — `'firstNmae'` reports `Did you mean '"firstName"'?` with no work from us.
+ *
+ * `D` bounds the depth. Without it, any bidirectional relation — every TypeORM
+ * `OneToMany`/`ManyToOne` pair — recurses User → Post → User and fails with
+ * TS2615. Each hop is a distinct instantiation, so the budget also keeps the
+ * union from growing with the size of the entity graph.
  */
-export type Path<T> = {
-  [K in keyof T & string]: NonNullable<T[K]> extends Terminal
-    ? K
-    : NonNullable<T[K]> extends readonly (infer E)[]
-      ? K | `${K}.${number}` | `${K}.${number}.${Path<NonNullable<E>>}`
-      : K | `${K}.${Path<NonNullable<T[K]>>}`;
-}[keyof T & string];
+export type Path<T, D extends number = 3> = [D] extends [never]
+  ? never
+  : {
+      [K in keyof T & string]: NonNullable<T[K]> extends Terminal
+        ? K
+        : NonNullable<T[K]> extends readonly (infer E)[]
+          ? K | `${K}.${number}` | `${K}.${number}.${Path<NonNullable<E>, Hops[D]>}`
+          : K | `${K}.${Path<NonNullable<T[K]>, Hops[D]>}`;
+    }[keyof T & string];
 
 /**
  * A resolved path segment. Produced by the planner, consumed by back-ends,
