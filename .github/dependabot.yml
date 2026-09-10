@@ -1,0 +1,27 @@
+version: 2
+
+updates:
+  # Pinned action versions in ci.yml and release.yml.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']
+
+  # Root devDependencies, the packages' own manifests, and the peer-range
+  # catalog in pnpm-workspace.yaml. Minor and patch bumps land as one weekly
+  # PR; majors get a PR each, since a peer major is a breaking change here.
+  - package-ecosystem: npm
+    directories: ['/', '/packages/*']
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
