@@ -39,7 +39,7 @@ jobs:
       # not yet on npm otherwise. Publishing authenticates through npm Trusted
       # Publishing (OIDC, via `id-token: write`), so there is no npm token: each
       # package lists this repo and release.yml as its trusted publisher on npm.
-      - uses: changesets/action@v1
+      - uses: changesets/action@v2
         id: changesets
         with:
           version: pnpm version-packages
