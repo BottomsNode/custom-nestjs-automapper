@@ -15,30 +15,51 @@ import { writeDropReason } from './policy.js';
 import { projectionFor, type ProjectOptions } from './project/projector.js';
 import { schemaOf, type OpenApiSchema, type SchemaOptions } from './schema/openapi.js';
 
+/** What `seal()` found. */
 export interface PlanReport {
+  /** `true` when every registered mapping resolved. */
   readonly ok: boolean;
+  /** The planned mappings, as `Source::Dto`, including nested DTOs. */
   readonly pairs: readonly string[];
+  /** One error per problem found. Empty when `ok`. */
   readonly diagnostics: readonly AutomapperError[];
 }
 
 export interface MapOptions<Ctx> {
+  /** Context passed to `visible()` predicates. */
   readonly ctx?: Ctx;
 }
 
 export interface MapperOptions {
   /**
-   * Applied to every field of a declared type — `{ date: v => v.toISOString() }`
-   * converts all dates at once. Possible only because each node carries its
-   * type, so it needs no per-field repetition.
+   * Converters applied to every field of a given type.
+   *
+   * @example
+   * ```ts
+   * new Mapper({ convert: { date: (v) => (v as Date).toISOString() } });
+   * ```
    */
   readonly convert?: TypeConverters;
 }
 
 /**
- * Declare → seal → serve (AD-16).
+ * Maps sources to DTOs with plans that are built and checked once, at `seal()`.
  *
- * `seal()` is the only place plans are built, so a broken mapping fails at
- * boot rather than on the request that happens to hit it.
+ * Lifecycle: `use()` adapters and `register()` DTOs, then `seal()`, then map.
+ * A broken mapping is reported by `seal()`, before any data is mapped. In
+ * NestJS, `AutomapperModule` does all of this for you.
+ *
+ * @typeParam Ctx - The context type passed to `visible()` predicates.
+ *
+ * @example
+ * ```ts
+ * const mapper = new Mapper().use(typeorm(dataSource)).register(UserDto);
+ *
+ * const report = mapper.seal();
+ * if (!report.ok) throw report.diagnostics[0];
+ *
+ * const dto = mapper.map(user, UserDto);
+ * ```
  */
 export class Mapper<Ctx = unknown> {
   private readonly registry = new AdapterRegistry();
@@ -49,13 +70,24 @@ export class Mapper<Ctx = unknown> {
 
   constructor(private readonly options: MapperOptions = {}) {}
 
+  /**
+   * Adds a schema adapter. When several describe the same type, the first one
+   * added wins.
+   *
+   * @throws AutomapperError `REGISTRY_SEALED` after `seal()`.
+   */
   use(adapter: SchemaAdapter): this {
     this.assertUnsealed('use');
     this.registry.use(adapter);
     return this;
   }
 
-  /** Records a DTO. Resolves nothing — descriptors are read at seal. */
+  /**
+   * Registers top-level DTOs to plan at `seal()`. DTOs reached through
+   * `nested()` or `collection()` are registered automatically.
+   *
+   * @throws AutomapperError `REGISTRY_SEALED` after `seal()`.
+   */
   register(...dtos: ClassLike[]): this {
     this.assertUnsealed('register');
     for (const dto of dtos) this.declared.add(dto);
@@ -63,10 +95,11 @@ export class Mapper<Ctx = unknown> {
   }
 
   /**
-   * Builds every plan, then closes over the DTOs their relations reference
-   * (CAP-6) so a nested pair never has to be registered by hand.
+   * Builds and checks every registered mapping, plus the nested DTOs they
+   * reference. Mapping is only possible after this.
    *
-   * Returns diagnostics; the caller decides process lifetime (AD-8).
+   * Never throws for a broken mapping. It returns the problems in
+   * `diagnostics` and leaves it to you whether to stop the process.
    */
   seal(): PlanReport {
     const diagnostics: AutomapperError[] = [];
@@ -135,10 +168,18 @@ export class Mapper<Ctx = unknown> {
     }
   }
 
+  /** Whether `seal()` has run. */
   isSealed(): boolean {
     return this.sealed;
   }
 
+  /**
+   * Maps one trusted source object, such as an ORM entity, to `dto`.
+   *
+   * @throws AutomapperError `REGISTRY_UNSEALED` before `seal()` or when `dto`
+   * is async (use `mapAsync()`), and `MAPPING_NOT_FOUND` when `dto` was never
+   * registered.
+   */
   map<D>(source: unknown, dto: ClassLike<D>, options: MapOptions<Ctx> = {}): D {
     const plan = this.planFor(dto, 'map');
     if (plan.isAsync) throw fail('REGISTRY_UNSEALED', { destType: dto, operation: 'map (async plan — use mapAsync)' });
@@ -151,6 +192,11 @@ export class Mapper<Ctx = unknown> {
    * `map` trusts its source; this does not. Silently ignoring extra keys is
    * how mass assignment gets through, so unknown and database-owned fields are
    * an error rather than a no-op.
+   *
+   * @param dto - A DTO declared with `Write()`.
+   * @throws AutomapperError `INPUT_FIELDS_REJECTED`, whose payload lists the
+   * `rejected` and `accepted` keys, and `DEST_NOT_RUNTIME_CLASS` when `dto` is
+   * not a `Write` DTO.
    */
   mapInput<D>(body: unknown, dto: ClassLike<D>, options: MapOptions<Ctx> = {}): D {
     const plan = this.planFor(dto, 'mapInput');
@@ -170,24 +216,50 @@ export class Mapper<Ctx = unknown> {
     return this.map(body, dto, options);
   }
 
+  /** `map()` over an array. */
   mapArray<D>(source: readonly unknown[], dto: ClassLike<D>, options: MapOptions<Ctx> = {}): D[] {
     return source.map((item) => this.map(item, dto, options));
   }
 
+  /**
+   * Maps a DTO that has `resolve()` fields, or reaches TypeORM lazy relations,
+   * awaiting them. Also works for synchronous DTOs.
+   */
   async mapAsync<D>(source: unknown, dto: ClassLike<D>, options: MapOptions<Ctx> = {}): Promise<D> {
     this.planFor(dto, 'mapAsync');
     return (await this.compiledFor(dto).invoke(source, options.ctx, newOpState())) as D;
   }
 
+  /** `mapAsync()` over an array, with the elements mapped concurrently. */
   mapArrayAsync<D>(source: readonly unknown[], dto: ClassLike<D>, options: MapOptions<Ctx> = {}): Promise<D[]> {
     return Promise.all(source.map((item) => this.mapAsync(item, dto, options)));
   }
 
+  /**
+   * The source fields and relations `dto` reads, in a form no ORM owns.
+   * Computed fields contribute their declared dependencies. `fields: []`
+   * means none.
+   *
+   * @throws AutomapperError `CONTEXT_REQUIRED` when `dto` has `visible()`
+   * fields and no `ctx` is given.
+   */
   projectionFor(dto: ClassLike, options: ProjectOptions = {}): FieldSelection {
     return projectionFor(this.planFor(dto, 'projectionFor'), options);
   }
 
-  /** ORM-native find options. Throws if the source's adapter cannot translate. */
+  /**
+   * `projectionFor()` translated into the ORM's own query options. The result
+   * is typed `unknown` because it depends on the adapter, so cast it.
+   *
+   * @example
+   * ```ts
+   * const options = mapper.nativeProjectionFor(UserDto) as FindManyOptions<User>;
+   * const users = await repo.find({ ...options, where: { active: true } });
+   * ```
+   *
+   * @throws AutomapperError `NO_ADAPTER` when the source's adapter cannot
+   * translate projections, and `CONTEXT_REQUIRED` as for `projectionFor()`.
+   */
   nativeProjectionFor(dto: ClassLike, options: ProjectOptions = {}): unknown {
     const plan = this.planFor(dto, 'nativeProjectionFor');
     const adapter = this.registry.find(plan.source);
@@ -197,19 +269,25 @@ export class Mapper<Ctx = unknown> {
     return adapter.toNativeProjection(projectionFor(plan, options), plan.source);
   }
 
-  /** OpenAPI schema for a DTO (CAP-9). */
+  /**
+   * An OpenAPI schema for `dto`, computed fields included. OpenAPI 3.0 by
+   * default; pass `{ version: '3.1' }` for type unions.
+   *
+   * It needs a sealed mapper, so decorators can't call it. With
+   * `@nestjs/swagger`, add the result to the document's `components.schemas`
+   * after the app boots.
+   */
   schemaOf(dto: ClassLike, options: SchemaOptions = {}): OpenApiSchema {
     return schemaOf(this.planFor(dto, 'schemaOf'), options);
   }
 
   /**
-   * Which of a DTO's source fields a client may supply, and why the rest are
-   * refused (CAP-8).
-   *
-   * Returns names rather than a generated class: a DTO's static type has to
-   * exist at declaration time, so a class built at seal could never be typed.
-   * Emitting a typed write DTO needs the CLI codegen path.
+   * Which fields of `dto`'s source a client may write, and why each of the
+   * others is refused (for example `id: 'primary key'`). Use it to inspect the
+   * write rules; `Write()` enforces them.
    */
+  // Returns names rather than a generated class: a DTO's static type has to
+  // exist at declaration time, so a class built at seal could never be typed.
   reverseOf(dto: ClassLike): { writable: string[]; dropped: Array<{ field: string; reason: string }> } {
     const plan = this.planFor(dto, 'reverseOf');
     const fields = this.registry.describe(plan.source).fields;
@@ -224,11 +302,15 @@ export class Mapper<Ctx = unknown> {
     return { writable, dropped };
   }
 
+  /** The sealed plan for `dto`, for tooling and debugging. */
   planOf(dto: ClassLike): MappingPlan | undefined {
     return this.plans.get(dto);
   }
 
-  /** Emitted source for a pair — what CAP-4's diagnostics show. */
+  /**
+   * The source code generated for `dto`'s mapping function, or `undefined`
+   * until it has been mapped once. For debugging.
+   */
   sourceOf(dto: ClassLike): string | undefined {
     return this.compiled.get(dto)?.source;
   }

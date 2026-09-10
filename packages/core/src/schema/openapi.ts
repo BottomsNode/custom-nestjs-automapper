@@ -21,6 +21,7 @@ export interface OpenApiSchema {
 export interface SchemaOptions {
   /** 3.0 emits `nullable: true`; 3.1 emits a type union. Default 3.0 — what @nestjs/swagger produces today. */
   version?: OpenApiVersion;
+  /** Sets the schema's `title`. */
   title?: string;
 }
 

@@ -40,12 +40,22 @@ export interface Resolver<Src, Out, Async extends boolean = false> {
 
 export type AnyResolver = Resolver<never, unknown, boolean>;
 
-/** Copy by convention. Explicit — there is no implicit auto-mapping. */
+/**
+ * Copies the source field `name`. `Pick` already copies picked fields, so this
+ * is only needed inside `extend`.
+ */
 export function auto<Src, Out>(name: Path<Src>): Resolver<Src, Out, false> {
   return { kind: 'auto', deps: [name], fn: (s) => (s as Record<string, unknown>)[name as string] };
 }
 
-/** Rename, or read a nested source path. */
+/**
+ * Reads a source field under a different name, or follows a dotted path.
+ *
+ * @example
+ * ```ts
+ * city: from<User, string>('address.city'),
+ * ```
+ */
 export function from<Src, Out>(path: Path<Src>): Resolver<Src, Out, false> {
   return {
     kind: 'from',
@@ -55,19 +65,41 @@ export function from<Src, Out>(path: Path<Src>): Resolver<Src, Out, false> {
 }
 
 /**
- * A derived field. `deps` are declared, not inferred: a lambda is opaque, and
- * projection must know which source columns feed the field or it under-fetches
- * silently. Proxy tracing and `fn.toString()` parsing were both rejected —
- * they under-collect across branches and break under minification.
+ * A field computed from other source fields.
+ *
+ * `deps` must list every source path `fn` reads. Projection fetches exactly
+ * those columns, so a missing dep means `fn` runs on data that was never
+ * loaded. The paths are type-checked against `Src`.
+ *
+ * @typeParam Src - The source entity.
+ * @typeParam Out - The field's type.
+ *
+ * @example
+ * ```ts
+ * fullName: compute<User, string>(['firstName', 'lastName'], (u) => `${u.firstName} ${u.lastName}`),
+ * ```
  */
 export function compute<Src, Out>(
   deps: readonly Path<Src>[],
   fn: (source: Src) => Out,
 ): Resolver<Src, Out, false> {
+  // Declared, not inferred: a lambda is opaque. Proxy tracing and
+  // `fn.toString()` parsing were rejected — they under-collect across branches
+  // and break under minification.
   return { kind: 'compute', deps: deps as readonly string[], fn: fn as (s: Src) => unknown };
 }
 
-/** An async derived field. Unwraps to `Awaited<Out>` and brands the plan async. */
+/**
+ * An async computed field. The field's type is the awaited value.
+ *
+ * The DTO becomes async: map it with `mapAsync()` or `mapArrayAsync()`.
+ * Calling `map()` on it is a type error.
+ *
+ * @example
+ * ```ts
+ * avatarUrl: resolve<User, string>(['id'], (u) => storage.signedUrl(u.id)),
+ * ```
+ */
 export function resolve<Src, Out>(
   deps: readonly Path<Src>[],
   fn: (source: Src) => Promise<Out>,
@@ -79,18 +111,32 @@ export function resolve<Src, Out>(
   } as Resolver<Src, Awaited<Out>, true>;
 }
 
+/** The same fixed value on every mapped object. */
 export function constant<Src, Out>(value: Out): Resolver<Src, Out, false> {
   return { kind: 'constant', deps: [], fn: () => value, constant: value };
 }
 
+/** Leaves the field unmapped on purpose, so the mapper does not report it as unresolved. */
 export function ignore<Src>(): Resolver<Src, never, false> {
   return { kind: 'ignore', deps: [], fn: () => undefined } as unknown as Resolver<Src, never, false>;
 }
 
 /**
- * Context gate. Widens the result to `Out | undefined`, so the DTO's declared
- * type stays honest and gating a required field is a type error rather than a
- * runtime surprise.
+ * Includes the field only when `predicate` passes for the context given at map
+ * time. Otherwise it is `undefined`, so the field's type is `Out | undefined`.
+ *
+ * Projection needs the context too. `projectionFor(Dto)` without `{ ctx }`
+ * throws `CONTEXT_REQUIRED` rather than fetching every gated column.
+ *
+ * @example
+ * ```ts
+ * email: visible<User, string, false>(
+ *   (ctx: { isAdmin: boolean }) => ctx.isAdmin,
+ *   from<User, string>('email'),
+ * ),
+ *
+ * mapper.map(user, UserDto, { ctx: { isAdmin: true } });
+ * ```
  */
 export function visible<Src, Out, Async extends boolean>(
   predicate: (ctx: never) => boolean,
@@ -106,19 +152,20 @@ export function visible<Src, Out, Async extends boolean>(
 }
 
 /**
- * Substitutes a fallback when the resolved value is null or undefined.
+ * Uses `fallback` when the inner resolver yields `null` or `undefined`, and
+ * removes `null | undefined` from the field's type.
  *
- * Covers both of automapper's nullSubstitution and undefinedSubstitution, and
- * narrows the field's type to NonNullable so the DTO stops advertising a null
- * it can no longer produce.
- *
- * Composes into a compute rather than adding a node kind, so no back-end has
- * to learn about it (AD-2).
+ * @example
+ * ```ts
+ * avatarUrl: defaultTo(from<User, string | null>('avatarUrl'), '/static/avatar.png'),
+ * ```
  */
 export function defaultTo<Src, Out, A extends boolean>(
   inner: Resolver<Src, Out, A>,
   fallback: NonNullable<Out>,
 ): Resolver<Src, NonNullable<Out>, A> {
+  // Composes into a compute rather than adding a node kind, so no back-end has
+  // to learn about it (AD-2).
   return {
     kind: inner.kind === 'resolve' ? 'resolve' : 'compute',
     deps: inner.deps,
@@ -131,8 +178,20 @@ export function defaultTo<Src, Out, A extends boolean>(
 }
 
 /**
- * A to-one relation, mapped by the given DTO. The source path defaults to the
- * destination field name; pass `path` when they differ.
+ * A to-one relation, mapped with the `target` DTO.
+ *
+ * Reads the source field with the same name; pass `path` when it differs. The
+ * target DTO is registered automatically when the mapper seals, and cycles and
+ * shared references are handled.
+ *
+ * `target` is a function so DTOs can reference each other. A DTO that
+ * references itself needs the return type annotated:
+ * `nested<Category, unknown>((): unknown => CategoryDto)`.
+ *
+ * @example
+ * ```ts
+ * author: nested<Post, AuthorDto>(() => AuthorDto),
+ * ```
  */
 export function nested<Src, Out>(
   target: () => unknown,
@@ -146,7 +205,15 @@ export function nested<Src, Out>(
   } as Resolver<Src, Out | undefined, false>;
 }
 
-/** A to-many relation, mapped element-wise by the given DTO. */
+/**
+ * A to-many relation, each element mapped with the `target` DTO. A missing
+ * relation maps to `[]`. See `nested()` for how `target` and `path` work.
+ *
+ * @example
+ * ```ts
+ * posts: collection<User, PostSummaryDto>(() => PostSummaryDto),
+ * ```
+ */
 export function collection<Src, Out>(
   target: () => unknown,
   path?: Path<Src>,

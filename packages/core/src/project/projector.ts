@@ -18,6 +18,7 @@ export const EMPTY_SELECTION: FieldSelection = Object.freeze({
 });
 
 export interface ProjectOptions {
+  /** Context for `visible()` predicates. Required when the DTO has any. */
   readonly ctx?: unknown;
 }
 

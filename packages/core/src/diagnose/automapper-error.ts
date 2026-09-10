@@ -6,6 +6,22 @@
 import type { ClassLike } from '../descriptor/types.js';
 import { ERROR_HEADLINE, type ErrorCode, type ErrorPayloads, type Origin } from './error-codes.js';
 
+/**
+ * The error every failure in this library throws. `code` identifies the
+ * problem, `payload` holds its details, and `message` says what failed, why,
+ * and what to do.
+ *
+ * @example
+ * ```ts
+ * try {
+ *   mapper.mapInput(body, CreateUserDto);
+ * } catch (error) {
+ *   if (error instanceof AutomapperError && error.is('INPUT_FIELDS_REJECTED')) {
+ *     console.warn(error.payload.rejected);
+ *   }
+ * }
+ * ```
+ */
 export class AutomapperError<C extends ErrorCode = ErrorCode> extends Error {
   readonly code: C;
   readonly payload: ErrorPayloads[C];
@@ -18,6 +34,7 @@ export class AutomapperError<C extends ErrorCode = ErrorCode> extends Error {
     Error.captureStackTrace?.(this, AutomapperError);
   }
 
+  /** Checks the code and narrows `payload` to that code's fields. */
   is<K extends ErrorCode>(code: K): this is AutomapperError<K> {
     return (this.code as ErrorCode) === code;
   }

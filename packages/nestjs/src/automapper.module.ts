@@ -15,6 +15,7 @@ import { MapToInterceptor } from './map-to.interceptor.js';
 import { MapBodyPipe } from './map-body.pipe.js';
 
 export interface AutomapperModuleOptions {
+  /** Schema adapters, such as `typeorm(dataSource)`. When several describe a type, the first wins. */
   adapters: SchemaAdapter[];
   /** DTOs to plan at boot. Nested relations are closed over automatically. */
   dtos?: ClassLike[];
@@ -31,10 +32,15 @@ export interface AutomapperOptionsFactory {
   createAutomapperOptions(): AutomapperModuleOptions | Promise<AutomapperModuleOptions>;
 }
 
+/** Provide exactly one of `useFactory`, `useClass` or `useExisting`. */
 export interface AutomapperModuleAsyncOptions {
+  /** Registers under a named token instead of the default one. */
   name?: string;
+  /** Modules exporting the providers listed in `inject`. */
   imports?: DynamicModule['imports'];
+  /** Providers passed to `useFactory`, in order. */
   inject?: Array<InjectionToken | OptionalFactoryDependency>;
+  /** Builds the options from the injected providers. */
   useFactory?: (...args: never[]) => AutomapperModuleOptions | Promise<AutomapperModuleOptions>;
   /** Instantiated by this module. */
   useClass?: Type<AutomapperOptionsFactory>;
@@ -56,6 +62,19 @@ const logger = new Logger('Automapper');
 @Global()
 @Module({})
 export class AutomapperModule {
+  /**
+   * Registers a global `Mapper`, and seals it while the app boots. A broken
+   * mapping fails startup. Also registers `MapToInterceptor` and `MapBodyPipe`
+   * globally, unless disabled.
+   *
+   * Use `forRootAsync` when an adapter needs a provider, such as TypeORM's
+   * `DataSource`.
+   *
+   * @example
+   * ```ts
+   * AutomapperModule.forRoot({ adapters: [typeorm(dataSource)], dtos: [UserDto] });
+   * ```
+   */
   static forRoot(options: AutomapperModuleOptions): DynamicModule {
     const token = getMapperToken(options.name);
     return {
@@ -69,7 +88,24 @@ export class AutomapperModule {
     };
   }
 
-  /** Same, with options resolved from DI — typically ConfigService. */
+  /**
+   * Like `forRoot`, with the options resolved from DI.
+   *
+   * `MapToInterceptor` and `MapBodyPipe` are always registered here, because
+   * the options are not known until the factory runs. Both do nothing on
+   * routes that don't use them.
+   *
+   * @example
+   * ```ts
+   * AutomapperModule.forRootAsync({
+   *   inject: [DataSource],
+   *   useFactory: (dataSource: DataSource) => ({
+   *     adapters: [typeorm(dataSource)],
+   *     dtos: [UserDto, CreateUserDto],
+   *   }),
+   * });
+   * ```
+   */
   static forRootAsync(options: AutomapperModuleAsyncOptions): DynamicModule {
     const token = getMapperToken(options.name);
     return {
